@@ -1,0 +1,24 @@
+name: rustdesk
+
+services:
+  hbbs:
+    image: rustdesk/rustdesk-server:${RUSTDESK_VERSION:-latest}
+    container_name: rustdesk-hbbs
+    command: ["hbbs", "-r", "${RUSTDESK_RELAY_SERVER:?Defina RUSTDESK_RELAY_SERVER no arquivo .env}"]
+    environment:
+      ALWAYS_USE_RELAY: ${ALWAYS_USE_RELAY:-N}
+    volumes:
+      - ./data:/root
+    network_mode: host
+    depends_on:
+      - hbbr
+    restart: unless-stopped
+
+  hbbr:
+    image: rustdesk/rustdesk-server:${RUSTDESK_VERSION:-latest}
+    container_name: rustdesk-hbbr
+    command: hbbr
+    volumes:
+      - ./data:/root
+    network_mode: host
+    restart: unless-stopped
