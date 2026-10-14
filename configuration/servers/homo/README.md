@@ -16,6 +16,10 @@ Apps no Coolify daqui usam domínio com **`https://`** (`https://app.homo.<domai
 daqui usa desafio ACME TLS-ALPN (o único que passa pelo passthrough do prod) e aceita PROXY protocol da VPN,
 para os apps verem o IP real do cliente. Ajustes e labels: [apps/coolify](../../apps/coolify/README.md).
 
+> **Levando um app para o homo?** Domínio e labels **não** são os do prod: `*.homo.grupoazuos.com.br`, rede
+> `coolify`, porta e `forwardauth` do homo, e URLs/cookies do ambiente apontando para o homo. Checklist em
+> [apps/coolify → Traefik do homo](../../apps/coolify/README.md#traefik-do-homo-o-que-muda-num-app).
+
 **Sem SSH:** este servidor é alterado só pelo painel do Coolify (`https://coolify.homo.<domain>`, ou
 `http://<IP do NetBird>:8000`).
 
