@@ -1,0 +1,8 @@
+# Os hosts.ini usam o grupo [servers] (mesmo formato do my-config). Aqui a
+# variável `server=` de cada linha vira os grupos prod e homo, usados pelo
+# deploy.yml e pelo --limit.
+plugin: ansible.builtin.constructed
+strict: true
+groups:
+  prod: server == 'prod'
+  homo: server == 'homo'
