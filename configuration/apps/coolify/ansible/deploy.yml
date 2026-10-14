@@ -1,0 +1,37 @@
+---
+# =========================================================================
+# === COOLIFY (instalador oficial: instala Docker junto) ===
+# =========================================================================
+
+- name: "[coolify] Instalar dependências"
+  package:
+    name: [curl, tar, openssl]
+    state: present
+  tags: [coolify]
+
+- name: "[coolify] Rodar instalador oficial do Coolify"
+  shell: curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
+  args:
+    creates: "{{ coolify_data_path }}/source/.env"
+  environment:
+    ROOT_USER_EMAIL: "{{ coolify_root_email | default('') }}"
+    ROOT_USER_PASSWORD: "{{ coolify_root_password | default('') }}"
+  tags: [coolify]
+
+- name: "[coolify] Esperar o proxy (Traefik) do Coolify ser gerado"
+  wait_for:
+    path: "{{ coolify_proxy_path }}/docker-compose.yml"
+    timeout: 600
+  tags: [coolify]
+
+- name: "[coolify] Conferir se o coolify-proxy está rodando"
+  command: docker inspect -f '{{ "{{" }}.State.Running{{ "}}" }}' coolify-proxy
+  register: proxy_running
+  changed_when: false
+  failed_when: proxy_running.stdout != 'true'
+  tags: [coolify]
+
+- name: "[coolify] Conferir se o proxy é Traefik"
+  command: grep -q 'image:.*traefik' {{ coolify_proxy_path }}/docker-compose.yml
+  changed_when: false
+  tags: [coolify]

@@ -1,0 +1,30 @@
+---
+# =========================================================================
+# === TÚNEL: LADO PROD (repassa *.homo pelo túnel, sem abrir o TLS) ===
+# =========================================================================
+# O certificado fica no homo, então aqui não precisa de API de DNS nem de lista de hosts.
+
+- name: "[tunnel] Pegar IP do homo na VPN"
+  set_fact:
+    tunnel_upstream_ip: "{{ hostvars[groups['homo'][0]].homo_vpn_ip | default('') }}"
+  tags: [tunnel]
+
+- name: "[tunnel] Conferir IP do homo"
+  assert:
+    that: tunnel_upstream_ip is match('^\d+\.\d+\.\d+\.\d+$')
+    fail_msg: "IP do homo na VPN não encontrado. Rode a etapa netbird-client ou defina homo_vpn_ip."
+  tags: [tunnel]
+
+- name: "[tunnel] Conferir se o homo responde na 443 pelo túnel"
+  wait_for:
+    host: "{{ tunnel_upstream_ip }}"
+    port: 443
+    timeout: 10
+  tags: [tunnel]
+
+- name: "[tunnel] Gravar rota *.{{ homo_domain }} no Traefik do Coolify"
+  template:
+    src: "{{ apps_dir }}/coolify/config/homo.yaml.j2"
+    dest: "{{ coolify_proxy_path }}/dynamic/homo.yaml"
+    mode: '0644'
+  tags: [tunnel]

@@ -1,0 +1,34 @@
+# Gerenciado pelo Ansible (apps/coolify/ansible/deploy.tunnel-prod.yml).
+# *.{{ homo_domain }} -> túnel NetBird -> Traefik do Coolify do homo, com o TLS intacto.
+# O homo emite os certificados (desafio TLS-ALPN, que atravessa o passthrough).
+
+# 80: só redireciona para https; o desafio ACME do homo não usa a porta 80.
+http:
+  middlewares:
+    homo-https-redirect:
+      redirectScheme:
+        scheme: https
+        permanent: true
+  routers:
+    homo-http:
+      entryPoints: [http]
+      rule: 'HostRegexp(`^.+\.{{ homo_domain | regex_escape }}$`)'
+      middlewares: [homo-https-redirect]
+      service: noop@internal
+
+# 443: escolhe pelo SNI e repassa a conexão TCP inteira.
+tcp:
+  routers:
+    homo:
+      entryPoints: [https]
+      rule: 'HostSNIRegexp(`^.+\.{{ homo_domain | regex_escape }}$`)'
+      service: homo
+      tls:
+        passthrough: true
+  services:
+    homo:
+      loadBalancer:
+        proxyProtocol:
+          version: 2
+        servers:
+          - address: "{{ tunnel_upstream_ip }}:443"

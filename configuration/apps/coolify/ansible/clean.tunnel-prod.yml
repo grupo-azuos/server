@@ -1,0 +1,10 @@
+---
+# =========================================================================
+# === TÚNEL: LADO PROD CLEAN / TEARDOWN ===
+# =========================================================================
+
+- name: "[tunnel] Remover rota *.homo do Traefik do Coolify"
+  file:
+    path: "{{ coolify_proxy_path }}/dynamic/homo.yaml"
+    state: absent
+  tags: [tunnel]

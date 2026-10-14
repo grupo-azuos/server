@@ -1,0 +1,57 @@
+---
+# =========================================================================
+# === TÚNEL: LADO HOMO (recebe *.homo do prod com o TLS intacto) ===
+# =========================================================================
+# O Coolify daqui emite os certificados dos apps normalmente; o desafio do Let's
+# Encrypt passa a ser TLS-ALPN (porta 443), o único que atravessa o passthrough.
+# Também descobre o IP do homo na VPN para o prod.
+
+- name: "[tunnel] Trocar desafio ACME de HTTP para TLS-ALPN"
+  replace:
+    path: "{{ coolify_proxy_path }}/docker-compose.yml"
+    regexp: '--certificatesresolvers\.letsencrypt\.acme\.httpchallenge=true'
+    replace: '--certificatesresolvers.letsencrypt.acme.tlschallenge=true'
+  register: patch_challenge
+  tags: [tunnel]
+
+- name: "[tunnel] Remover entrypoint do desafio HTTP"
+  lineinfile:
+    path: "{{ coolify_proxy_path }}/docker-compose.yml"
+    regexp: '--certificatesresolvers\.letsencrypt\.acme\.httpchallenge\.entrypoint='
+    state: absent
+  register: patch_entrypoint
+  tags: [tunnel]
+
+# O prod repassa a conexão com PROXY protocol: é como o homo vê o IP real do cliente.
+- name: "[tunnel] Aceitar PROXY protocol vindo da VPN no entrypoint https"
+  replace:
+    path: "{{ coolify_proxy_path }}/docker-compose.yml"
+    regexp: '^(\s*)(- ["'']?--entrypoints\.https\.address=:443["'']?)\s*$(?![\s\S]*https\.proxyProtocol\.trustedIPs)'
+    replace: '\1\2\n\1- ''--entrypoints.https.proxyProtocol.trustedIPs={{ vpn_cidr }}'''
+  register: patch_proxy_protocol
+  tags: [tunnel]
+
+- name: "[tunnel] Recriar coolify-proxy com os ajustes"
+  command: docker compose up -d --force-recreate
+  args:
+    chdir: "{{ coolify_proxy_path }}"
+  when: patch_challenge is changed or patch_entrypoint is changed or patch_proxy_protocol is changed
+  tags: [tunnel]
+
+- name: "[tunnel] Ler IP do homo na VPN"
+  command: netbird status --json
+  register: nb_status
+  changed_when: false
+  when: homo_vpn_ip | length == 0
+  tags: [tunnel]
+
+- name: "[tunnel] Registrar IP do homo na VPN"
+  set_fact:
+    homo_vpn_ip: "{{ (nb_status.stdout | from_json).netbirdIp | split('/') | first }}"
+  when: homo_vpn_ip | length == 0
+  tags: [tunnel]
+
+- name: "[tunnel] IP do homo na VPN"
+  debug:
+    msg: "{{ homo_vpn_ip }}"
+  tags: [tunnel]
