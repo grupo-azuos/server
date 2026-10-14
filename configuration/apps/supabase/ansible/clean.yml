@@ -1,0 +1,16 @@
+---
+# =========================================================================
+# === SUPABASE CLEAN / TEARDOWN ===
+# =========================================================================
+
+- name: "[supabase] Parar e remover containers do Supabase"
+  command: docker compose -f {{ supabase_path | default('/opt/supabase') }}/docker-compose.yml down
+  failed_when: false
+  tags: [supabase]
+
+- name: "[supabase] Remover diretório de deploy do Supabase (se solicitado)"
+  file:
+    path: "{{ supabase_path | default('/opt/supabase') }}"
+    state: absent
+  when: remove_volumes | default(false) | bool
+  tags: [supabase]

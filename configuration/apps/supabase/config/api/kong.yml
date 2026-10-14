@@ -1,0 +1,293 @@
+# =============================================================================
+#  Config declarativa do Kong = o API Gateway do Supabase.
+#  Tudo entra por http://localhost:8000 e o Kong decide para qual servico vai:
+#     /auth/v1/*      -> GoTrue    (autenticacao)
+#     /rest/v1/*      -> PostgREST (CRUD nas tabelas)
+#     /realtime/v1/*  -> Realtime  (websocket)
+#     /storage/v1/*   -> Storage   (upload/download)
+#     /functions/v1/* -> Edge Functions (Deno)
+#     /pg/*           -> postgres-meta (so service_role)
+#     /               -> Studio    (painel, protegido por basic auth)
+#
+#  As variaveis $SUPABASE_ANON_KEY etc. sao expandidas no boot do container.
+#  NAO use aspas duplas neste arquivo (o expansor do entrypoint quebraria).
+# =============================================================================
+_format_version: '3.0'
+_transform: true
+
+###
+### Consumidores: quem pode chamar a API e com qual apikey
+###
+consumers:
+  - username: DASHBOARD
+  - username: anon
+    keyauth_credentials:
+      - key: $SUPABASE_ANON_KEY
+  - username: service_role
+    keyauth_credentials:
+      - key: $SUPABASE_SERVICE_KEY
+
+###
+### Grupos ACL: admin = service_role, anon = chave publica
+###
+acls:
+  - consumer: anon
+    group: anon
+  - consumer: service_role
+    group: admin
+
+###
+### Basic auth do painel Studio
+###
+basicauth_credentials:
+  - consumer: DASHBOARD
+    username: $DASHBOARD_USERNAME
+    password: $DASHBOARD_PASSWORD
+
+###
+### Plugin global de CORS
+###
+plugins:
+  - name: cors
+    config:
+      origins:
+        - '$CORS_ORIGIN'
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+        - HEAD
+      headers:
+        - Accept
+        - Authorization
+        - Content-Type
+        - apikey
+        - x-client-info
+        - x-supabase-api-version
+        - Range
+        - Prefer
+      exposed_headers:
+        - Content-Range
+        - Content-Length
+        - X-Total-Count
+      credentials: true
+      max_age: 3600
+
+services:
+
+  ## ---------------------------------------------------------------------
+  ## AUTH - rotas publicas (nao exigem apikey: links de email e OAuth)
+  ## ---------------------------------------------------------------------
+  - name: auth-v1-open
+    url: http://auth:9999/verify
+    routes:
+      - name: auth-v1-open
+        strip_path: true
+        paths:
+          - /auth/v1/verify
+
+  - name: auth-v1-open-callback
+    url: http://auth:9999/callback
+    routes:
+      - name: auth-v1-open-callback
+        strip_path: true
+        paths:
+          - /auth/v1/callback
+
+  - name: auth-v1-open-authorize
+    url: http://auth:9999/authorize
+    routes:
+      - name: auth-v1-open-authorize
+        strip_path: true
+        paths:
+          - /auth/v1/authorize
+
+  ## ---------------------------------------------------------------------
+  ## AUTH - resto da API (signup, token, user, admin...) exige apikey
+  ## ---------------------------------------------------------------------
+  - name: auth-v1
+    _comment: GoTrue - /auth/v1/* vai para http://auth:9999/*
+    url: http://auth:9999/
+    routes:
+      - name: auth-v1-all
+        strip_path: true
+        paths:
+          - /auth/v1/
+    plugins:
+      - name: key-auth
+        config:
+          hide_credentials: false
+          key_names:
+            - apikey
+      - name: acl
+        config:
+          hide_groups_header: true
+          allow:
+            - admin
+            - anon
+
+  ## ---------------------------------------------------------------------
+  ## REST - PostgREST: cada tabela/view vira um endpoint HTTP
+  ## ---------------------------------------------------------------------
+  - name: rest-v1
+    _comment: PostgREST - /rest/v1/* vai para http://rest:3000/*
+    url: http://rest:3000/
+    routes:
+      - name: rest-v1-all
+        strip_path: true
+        paths:
+          - /rest/v1/
+    plugins:
+      - name: key-auth
+        config:
+          hide_credentials: true
+          key_names:
+            - apikey
+      - name: acl
+        config:
+          hide_groups_header: true
+          allow:
+            - admin
+            - anon
+
+  ## ---------------------------------------------------------------------
+  ## GraphQL (extensao pg_graphql)
+  ## ---------------------------------------------------------------------
+  - name: graphql-v1
+    _comment: pg_graphql - /graphql/v1 vai para http://rest:3000/rpc/graphql
+    url: http://rest:3000/rpc/graphql
+    routes:
+      - name: graphql-v1-all
+        strip_path: true
+        paths:
+          - /graphql/v1
+    plugins:
+      - name: key-auth
+        config:
+          hide_credentials: true
+          key_names:
+            - apikey
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - Content-Profile:graphql_public
+      - name: acl
+        config:
+          hide_groups_header: true
+          allow:
+            - admin
+            - anon
+
+  ## ---------------------------------------------------------------------
+  ## REALTIME - websocket de mudancas no banco
+  ## ---------------------------------------------------------------------
+  - name: realtime-v1-ws
+    _comment: Realtime websocket
+    url: http://realtime-dev.supabase-realtime:4000/socket
+    protocol: ws
+    routes:
+      - name: realtime-v1-ws
+        strip_path: true
+        paths:
+          - /realtime/v1/
+    plugins:
+      - name: key-auth
+        config:
+          hide_credentials: false
+          key_names:
+            - apikey
+      - name: acl
+        config:
+          hide_groups_header: true
+          allow:
+            - admin
+            - anon
+
+  - name: realtime-v1-rest
+    _comment: Realtime REST - broadcast via HTTP
+    url: http://realtime-dev.supabase-realtime:4000/api
+    protocol: http
+    routes:
+      - name: realtime-v1-rest
+        strip_path: true
+        paths:
+          - /realtime/v1/api
+    plugins:
+      - name: key-auth
+        config:
+          hide_credentials: false
+          key_names:
+            - apikey
+      - name: acl
+        config:
+          hide_groups_header: true
+          allow:
+            - admin
+            - anon
+
+  ## ---------------------------------------------------------------------
+  ## STORAGE - upload/download. Valida o JWT sozinho, entao sem key-auth.
+  ## ---------------------------------------------------------------------
+  - name: storage-v1
+    _comment: Storage - /storage/v1/* vai para http://storage:5000/*
+    url: http://storage:5000/
+    routes:
+      - name: storage-v1-all
+        strip_path: true
+        paths:
+          - /storage/v1/
+
+  ## ---------------------------------------------------------------------
+  ## EDGE FUNCTIONS - runtime Deno
+  ## ---------------------------------------------------------------------
+  - name: functions-v1
+    _comment: Edge Functions - /functions/v1/* vai para http://functions:9000/*
+    url: http://functions:9000/
+    routes:
+      - name: functions-v1-all
+        strip_path: true
+        paths:
+          - /functions/v1/
+
+  ## ---------------------------------------------------------------------
+  ## PG-META - API de metadados do banco (so service_role)
+  ## ---------------------------------------------------------------------
+  - name: meta
+    _comment: pg-meta - /pg/* vai para http://meta:8080/*
+    url: http://meta:8080/
+    routes:
+      - name: meta-all
+        strip_path: true
+        paths:
+          - /pg/
+    plugins:
+      - name: key-auth
+        config:
+          hide_credentials: false
+          key_names:
+            - apikey
+      - name: acl
+        config:
+          hide_groups_header: true
+          allow:
+            - admin
+
+  ## ---------------------------------------------------------------------
+  ## STUDIO - o painel. Fica na raiz e pede usuario/senha.
+  ## ---------------------------------------------------------------------
+  - name: dashboard
+    _comment: Studio - / vai para http://studio:3000/
+    url: http://studio:3000/
+    routes:
+      - name: dashboard-all
+        strip_path: true
+        paths:
+          - /
+    plugins:
+      - name: basic-auth
+        config:
+          hide_credentials: true

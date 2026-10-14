@@ -1,0 +1,704 @@
+# GERADO por build_compose_coolify.py a partir de compose.coolify.base.yml e config/. Não edite à mão.
+# Cole este arquivo no Coolify do homo (veja o README).
+#
+# Supabase self-hosted para o Coolify do homo (Project → + New → Docker Compose Empty).
+# Segredos: variáveis do recurso no painel (gere com gerar-segredos.sh). O resto tem default aqui.
+# Entrada pública: só o Kong, pelo Traefik do homo, em https://${SUPABASE_HOST}.
+#
+# Serviços: db (Postgres), auth (GoTrue), rest (PostgREST), storage, meta, studio e kong.
+# Com COMPOSE_PROFILES=extras também sobem realtime, imgproxy e functions (Edge Runtime).
+
+volumes:
+  db-data:
+  storage-data:
+
+networks:
+  supabase:
+  coolify:
+    external: true
+
+services:
+  db:
+    image: supabase/postgres:15.14.1.171
+    restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      - -c
+      - log_min_messages=fatal
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      POSTGRES_DB: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?gere com gerar-segredos.sh}
+      PGPORT: "5432"
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: postgres
+      # Lidos pelos scripts de init (jwt.sql)
+      JWT_SECRET: ${JWT_SECRET:?gere com gerar-segredos.sh}
+      JWT_EXP: ${JWT_EXPIRY:-3600}
+    ports:
+      # Por padrão só no loopback do homo. Para acessar pela VPN, use POSTGRES_BIND_IP=<IP do homo no NetBird>.
+      - "${POSTGRES_BIND_IP:-127.0.0.1}:${POSTGRES_PORT_EXTERNAL:-5432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # Rodados UMA VEZ, na criação do volume
+      - type: bind
+        source: ./config/db/realtime.sql
+        target: /docker-entrypoint-initdb.d/migrations/99-realtime.sql
+        read_only: true
+        content: |
+          -- Schema onde o servico Realtime guarda tenants e subscriptions.
+          create schema if not exists _realtime;
+          alter schema _realtime owner to supabase_admin;
+      - type: bind
+        source: ./config/db/roles.sql
+        target: /docker-entrypoint-initdb.d/init-scripts/99-roles.sql
+        read_only: true
+        content: |
+          -- Define a senha das roles internas do Supabase a partir de $$POSTGRES_PASSWORD.
+          -- Usa \gexec para so alterar roles que realmente existem na imagem,
+          -- assim o init nao quebra se uma versao do supabase/postgres mudar o conjunto.
+          \set pgpass `echo "$$POSTGRES_PASSWORD"`
+
+          select format('alter role %I with password %L', rolname, :'pgpass')
+          from pg_roles
+          where rolname in (
+            'supabase_admin',
+            'authenticator',
+            'pgbouncer',
+            'supabase_auth_admin',
+            'supabase_functions_admin',
+            'supabase_storage_admin',
+            'supabase_read_only_user'
+          )
+          \gexec
+      - type: bind
+        source: ./config/db/jwt.sql
+        target: /docker-entrypoint-initdb.d/init-scripts/99-jwt.sql
+        read_only: true
+        content: |
+          -- Publica o segredo JWT dentro do banco: e assim que o PostgREST e as
+          -- funcoes auth.uid() / auth.role() validam o token de cada request.
+          \set jwt_secret `echo "$$JWT_SECRET"`
+          \set jwt_exp `echo "$$JWT_EXP"`
+
+          alter database postgres set "app.settings.jwt_secret" to :'jwt_secret';
+          alter database postgres set "app.settings.jwt_exp" to :'jwt_exp';
+    networks: [supabase]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  auth:
+    image: supabase/gotrue:v2.197.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: https://${SUPABASE_HOST:-supabase.homo.grupoazuos.com.br}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: ${SITE_URL:-https://supabase.homo.grupoazuos.com.br}
+      GOTRUE_URI_ALLOW_LIST: ${ADDITIONAL_REDIRECT_URLS:-}
+      GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP:-true}
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: ${JWT_EXPIRY:-3600}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_ISSUER: supabase
+      # Sem SMTP, o autoconfirm é o único jeito de o usuário nascer utilizável. Com SMTP, desligue-o.
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: ${ENABLE_EMAIL_SIGNUP:-true}
+      GOTRUE_MAILER_AUTOCONFIRM: ${ENABLE_EMAIL_AUTOCONFIRM:-true}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-}
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:-}
+      # O GoTrue não sobe com porta vazia
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-587}
+      GOTRUE_SMTP_USER: ${SMTP_USER:-}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:-}
+      GOTRUE_SMTP_MAX_FREQUENCY: 1s
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+      GOTRUE_SMS_AUTOCONFIRM: "false"
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: ${ENABLE_ANONYMOUS_USERS:-false}
+      GOTRUE_LOG_LEVEL: info
+    networks: [supabase]
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  rest:
+    image: postgrest/postgrest:v16.3
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage,graphql_public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
+      PGRST_APP_SETTINGS_JWT_EXP: ${JWT_EXPIRY:-3600}
+    command: ["postgrest"]
+    networks: [supabase]
+
+  # O hostname do Realtime PRECISA ter um ponto (cluster Erlang). O kong.yml usa este alias.
+  realtime:
+    profiles: [extras]
+    image: supabase/realtime:v2.135.1
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: "4000"
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: postgres
+      DB_AFTER_CONNECT_QUERY: SET search_path TO _realtime
+      DB_ENC_KEY: ${REALTIME_ENC_KEY:-}
+      API_JWT_SECRET: ${JWT_SECRET}
+      METRICS_JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-}
+      ERL_AFLAGS: -proto_dist inet_tcp
+      DNS_NODES: "''"
+      RLIMIT_NOFILE: "10000"
+      APP_NAME: realtime
+      SEED_SELF_HOST: "true"
+      RUN_JANITOR: "true"
+    networks:
+      supabase:
+        aliases: [realtime-dev.supabase-realtime]
+
+  storage:
+    image: supabase/storage-api:v1.77.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      rest:
+        condition: service_started
+    environment:
+      ANON_KEY: ${ANON_KEY:?gere com gerar-segredos.sh}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY:?gere com gerar-segredos.sh}
+      POSTGREST_URL: http://rest:3000
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      DB_INSTALL_ROLES: "false"
+      # Por upload, em bytes (50 MB)
+      FILE_SIZE_LIMIT: ${STORAGE_FILE_SIZE_LIMIT:-52428800}
+      TENANT_ID: supabase
+      REGION: local
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      # Exigido pela imagem mesmo no modo file; valor ignorado
+      GLOBAL_S3_BUCKET: stub
+      ENABLE_IMAGE_TRANSFORMATION: ${ENABLE_IMAGE_TRANSFORMATION:-false}
+      IMGPROXY_URL: http://imgproxy:5001
+      # API S3: https://${SUPABASE_HOST}/storage/v1/s3, região local, path-style. O prefixo faz a assinatura
+      # SigV4 do cliente (calculada com /storage/v1, que o Kong corta) bater.
+      S3_PROTOCOL_ACCESS_KEY_ID: ${S3_PROTOCOL_ACCESS_KEY_ID:?gere com gerar-segredos.sh}
+      S3_PROTOCOL_ACCESS_KEY_SECRET: ${S3_PROTOCOL_ACCESS_KEY_SECRET:?gere com gerar-segredos.sh}
+      S3_PROTOCOL_PREFIX: /storage/v1
+    volumes:
+      - storage-data:/var/lib/storage
+    networks: [supabase]
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:5000/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  imgproxy:
+    profiles: [extras]
+    image: darthsim/imgproxy:v4.0.14
+    restart: unless-stopped
+    environment:
+      IMGPROXY_BIND: ":5001"
+      IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
+      IMGPROXY_USE_ETAG: "true"
+      IMGPROXY_ENABLE_WEBP_DETECTION: "true"
+    volumes:
+      - storage-data:/var/lib/storage:ro
+    networks: [supabase]
+
+  meta:
+    image: supabase/postgres-meta:v0.99.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PG_META_PORT: "8080"
+      PG_META_DB_HOST: db
+      PG_META_DB_PORT: "5432"
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: supabase_admin
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+    networks: [supabase]
+
+  functions:
+    profiles: [extras]
+    image: supabase/edge-runtime:v1.76.2
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      VERIFY_JWT: ${FUNCTIONS_VERIFY_JWT:-true}
+    volumes:
+      - type: bind
+        source: ./config/functions/main/index.ts
+        target: /home/deno/functions/main/index.ts
+        read_only: true
+        content: |
+          // Main service do Edge Runtime: recebe TODA requisicao em /functions/v1/<nome>
+          // e despacha para a pasta volumes/functions/<nome>/index.ts.
+          // Para criar uma funcao nova basta criar a pasta -- nao precisa reiniciar nada.
+          import { STATUS_CODE } from 'jsr:@std/http/status'
+
+          Deno.serve(async (req: Request) => {
+            const url = new URL(req.url)
+            const { pathname } = url
+            const functionName = pathname.split('/').filter(Boolean)[0]
+
+            if (!functionName) {
+              return new Response(
+                JSON.stringify({ message: 'edge runtime do supabase no ar. use /functions/v1/hello' }),
+                { headers: { 'Content-Type': 'application/json' } },
+              )
+            }
+
+            const servicePath = `/home/deno/functions/$${functionName}`
+
+            try {
+              const worker = await EdgeRuntime.userWorkers.create({
+                servicePath,
+                memoryLimitMb: 150,
+                workerTimeoutMs: 5 * 60 * 1000,
+                noModuleCache: false,
+                envVars: Object.entries(Deno.env.toObject()),
+              })
+              return await worker.fetch(req)
+            } catch (e) {
+              return new Response(
+                JSON.stringify({ error: String(e), function: functionName }),
+                {
+                  status: STATUS_CODE.InternalServerError,
+                  headers: { 'Content-Type': 'application/json' },
+                },
+              )
+            }
+          })
+      - type: bind
+        source: ./config/functions/hello/index.ts
+        target: /home/deno/functions/hello/index.ts
+        read_only: true
+        content: |
+          // Funcao de exemplo. Teste com:
+          //   curl http://localhost:8000/functions/v1/hello -H "apikey: <ANON_KEY>"
+          Deno.serve((req: Request) => {
+            return new Response(
+              JSON.stringify({
+                ok: true,
+                message: 'edge function rodando no servidor',
+                method: req.method,
+                at: new Date().toISOString(),
+              }),
+              { headers: { 'Content-Type': 'application/json' } },
+            )
+          })
+    command: ["start", "--main-service", "/home/deno/functions/main"]
+    networks: [supabase]
+
+  studio:
+    image: supabase/studio:2026.09.14-sha-4dd8a95
+    restart: unless-stopped
+    depends_on:
+      meta:
+        condition: service_started
+    environment:
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DEFAULT_ORGANIZATION_NAME: grupoazuos
+      DEFAULT_PROJECT_NAME: homo
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: https://${SUPABASE_HOST:-supabase.homo.grupoazuos.com.br}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      NEXT_PUBLIC_ENABLE_LOGS: "false"
+      NEXT_ANALYTICS_BACKEND_PROVIDER: postgres
+      HOSTNAME: 0.0.0.0
+    networks: [supabase]
+
+  # Único ponto de entrada. O Traefik do homo chega nele pela rede coolify.
+  kong:
+    image: kong:3.9
+    restart: unless-stopped
+    depends_on:
+      auth:
+        condition: service_started
+      rest:
+        condition: service_started
+      storage:
+        condition: service_started
+      studio:
+        condition: service_started
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /tmp/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      # Expandidas no kong.yml pelo entrypoint
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      DASHBOARD_USERNAME: ${DASHBOARD_USERNAME:-supabase}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:?gere com gerar-segredos.sh}
+      CORS_ORIGIN: ${KONG_CORS_ORIGIN:-*}
+    volumes:
+      - type: bind
+        source: ./config/api/kong.yml
+        target: /home/kong/temp.yml
+        read_only: true
+        content: |
+          # =============================================================================
+          #  Config declarativa do Kong = o API Gateway do Supabase.
+          #  Tudo entra por http://localhost:8000 e o Kong decide para qual servico vai:
+          #     /auth/v1/*      -> GoTrue    (autenticacao)
+          #     /rest/v1/*      -> PostgREST (CRUD nas tabelas)
+          #     /realtime/v1/*  -> Realtime  (websocket)
+          #     /storage/v1/*   -> Storage   (upload/download)
+          #     /functions/v1/* -> Edge Functions (Deno)
+          #     /pg/*           -> postgres-meta (so service_role)
+          #     /               -> Studio    (painel, protegido por basic auth)
+          #
+          #  As variaveis $$SUPABASE_ANON_KEY etc. sao expandidas no boot do container.
+          #  NAO use aspas duplas neste arquivo (o expansor do entrypoint quebraria).
+          # =============================================================================
+          _format_version: '3.0'
+          _transform: true
+
+          ###
+          ### Consumidores: quem pode chamar a API e com qual apikey
+          ###
+          consumers:
+            - username: DASHBOARD
+            - username: anon
+              keyauth_credentials:
+                - key: $$SUPABASE_ANON_KEY
+            - username: service_role
+              keyauth_credentials:
+                - key: $$SUPABASE_SERVICE_KEY
+
+          ###
+          ### Grupos ACL: admin = service_role, anon = chave publica
+          ###
+          acls:
+            - consumer: anon
+              group: anon
+            - consumer: service_role
+              group: admin
+
+          ###
+          ### Basic auth do painel Studio
+          ###
+          basicauth_credentials:
+            - consumer: DASHBOARD
+              username: $$DASHBOARD_USERNAME
+              password: $$DASHBOARD_PASSWORD
+
+          ###
+          ### Plugin global de CORS
+          ###
+          plugins:
+            - name: cors
+              config:
+                origins:
+                  - '$$CORS_ORIGIN'
+                methods:
+                  - GET
+                  - POST
+                  - PUT
+                  - PATCH
+                  - DELETE
+                  - OPTIONS
+                  - HEAD
+                headers:
+                  - Accept
+                  - Authorization
+                  - Content-Type
+                  - apikey
+                  - x-client-info
+                  - x-supabase-api-version
+                  - Range
+                  - Prefer
+                exposed_headers:
+                  - Content-Range
+                  - Content-Length
+                  - X-Total-Count
+                credentials: true
+                max_age: 3600
+
+          services:
+
+            ## ---------------------------------------------------------------------
+            ## AUTH - rotas publicas (nao exigem apikey: links de email e OAuth)
+            ## ---------------------------------------------------------------------
+            - name: auth-v1-open
+              url: http://auth:9999/verify
+              routes:
+                - name: auth-v1-open
+                  strip_path: true
+                  paths:
+                    - /auth/v1/verify
+
+            - name: auth-v1-open-callback
+              url: http://auth:9999/callback
+              routes:
+                - name: auth-v1-open-callback
+                  strip_path: true
+                  paths:
+                    - /auth/v1/callback
+
+            - name: auth-v1-open-authorize
+              url: http://auth:9999/authorize
+              routes:
+                - name: auth-v1-open-authorize
+                  strip_path: true
+                  paths:
+                    - /auth/v1/authorize
+
+            ## ---------------------------------------------------------------------
+            ## AUTH - resto da API (signup, token, user, admin...) exige apikey
+            ## ---------------------------------------------------------------------
+            - name: auth-v1
+              _comment: GoTrue - /auth/v1/* vai para http://auth:9999/*
+              url: http://auth:9999/
+              routes:
+                - name: auth-v1-all
+                  strip_path: true
+                  paths:
+                    - /auth/v1/
+              plugins:
+                - name: key-auth
+                  config:
+                    hide_credentials: false
+                    key_names:
+                      - apikey
+                - name: acl
+                  config:
+                    hide_groups_header: true
+                    allow:
+                      - admin
+                      - anon
+
+            ## ---------------------------------------------------------------------
+            ## REST - PostgREST: cada tabela/view vira um endpoint HTTP
+            ## ---------------------------------------------------------------------
+            - name: rest-v1
+              _comment: PostgREST - /rest/v1/* vai para http://rest:3000/*
+              url: http://rest:3000/
+              routes:
+                - name: rest-v1-all
+                  strip_path: true
+                  paths:
+                    - /rest/v1/
+              plugins:
+                - name: key-auth
+                  config:
+                    hide_credentials: true
+                    key_names:
+                      - apikey
+                - name: acl
+                  config:
+                    hide_groups_header: true
+                    allow:
+                      - admin
+                      - anon
+
+            ## ---------------------------------------------------------------------
+            ## GraphQL (extensao pg_graphql)
+            ## ---------------------------------------------------------------------
+            - name: graphql-v1
+              _comment: pg_graphql - /graphql/v1 vai para http://rest:3000/rpc/graphql
+              url: http://rest:3000/rpc/graphql
+              routes:
+                - name: graphql-v1-all
+                  strip_path: true
+                  paths:
+                    - /graphql/v1
+              plugins:
+                - name: key-auth
+                  config:
+                    hide_credentials: true
+                    key_names:
+                      - apikey
+                - name: request-transformer
+                  config:
+                    add:
+                      headers:
+                        - Content-Profile:graphql_public
+                - name: acl
+                  config:
+                    hide_groups_header: true
+                    allow:
+                      - admin
+                      - anon
+
+            ## ---------------------------------------------------------------------
+            ## REALTIME - websocket de mudancas no banco
+            ## ---------------------------------------------------------------------
+            - name: realtime-v1-ws
+              _comment: Realtime websocket
+              url: http://realtime-dev.supabase-realtime:4000/socket
+              protocol: ws
+              routes:
+                - name: realtime-v1-ws
+                  strip_path: true
+                  paths:
+                    - /realtime/v1/
+              plugins:
+                - name: key-auth
+                  config:
+                    hide_credentials: false
+                    key_names:
+                      - apikey
+                - name: acl
+                  config:
+                    hide_groups_header: true
+                    allow:
+                      - admin
+                      - anon
+
+            - name: realtime-v1-rest
+              _comment: Realtime REST - broadcast via HTTP
+              url: http://realtime-dev.supabase-realtime:4000/api
+              protocol: http
+              routes:
+                - name: realtime-v1-rest
+                  strip_path: true
+                  paths:
+                    - /realtime/v1/api
+              plugins:
+                - name: key-auth
+                  config:
+                    hide_credentials: false
+                    key_names:
+                      - apikey
+                - name: acl
+                  config:
+                    hide_groups_header: true
+                    allow:
+                      - admin
+                      - anon
+
+            ## ---------------------------------------------------------------------
+            ## STORAGE - upload/download. Valida o JWT sozinho, entao sem key-auth.
+            ## ---------------------------------------------------------------------
+            - name: storage-v1
+              _comment: Storage - /storage/v1/* vai para http://storage:5000/*
+              url: http://storage:5000/
+              routes:
+                - name: storage-v1-all
+                  strip_path: true
+                  paths:
+                    - /storage/v1/
+
+            ## ---------------------------------------------------------------------
+            ## EDGE FUNCTIONS - runtime Deno
+            ## ---------------------------------------------------------------------
+            - name: functions-v1
+              _comment: Edge Functions - /functions/v1/* vai para http://functions:9000/*
+              url: http://functions:9000/
+              routes:
+                - name: functions-v1-all
+                  strip_path: true
+                  paths:
+                    - /functions/v1/
+
+            ## ---------------------------------------------------------------------
+            ## PG-META - API de metadados do banco (so service_role)
+            ## ---------------------------------------------------------------------
+            - name: meta
+              _comment: pg-meta - /pg/* vai para http://meta:8080/*
+              url: http://meta:8080/
+              routes:
+                - name: meta-all
+                  strip_path: true
+                  paths:
+                    - /pg/
+              plugins:
+                - name: key-auth
+                  config:
+                    hide_credentials: false
+                    key_names:
+                      - apikey
+                - name: acl
+                  config:
+                    hide_groups_header: true
+                    allow:
+                      - admin
+
+            ## ---------------------------------------------------------------------
+            ## STUDIO - o painel. Fica na raiz e pede usuario/senha.
+            ## ---------------------------------------------------------------------
+            - name: dashboard
+              _comment: Studio - / vai para http://studio:3000/
+              url: http://studio:3000/
+              routes:
+                - name: dashboard-all
+                  strip_path: true
+                  paths:
+                    - /
+              plugins:
+                - name: basic-auth
+                  config:
+                    hide_credentials: true
+    entrypoint: >
+      bash -c 'eval "echo \"$$(cat /home/kong/temp.yml)\"" > /tmp/kong.yml
+      && /docker-entrypoint.sh kong docker-start'
+    networks: [supabase, coolify]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      - traefik.http.middlewares.supabase-redirect.redirectscheme.scheme=https
+      - traefik.http.middlewares.supabase-redirect.redirectscheme.permanent=true
+      - traefik.http.middlewares.supabase-headers.headers.contentTypeNosniff=true
+      - traefik.http.middlewares.supabase-headers.headers.stsIncludeSubdomains=true
+      - traefik.http.middlewares.supabase-headers.headers.stsSeconds=31536000
+      - traefik.http.routers.supabase-http.entrypoints=http
+      - traefik.http.routers.supabase-http.rule=Host(`${SUPABASE_HOST:-supabase.homo.grupoazuos.com.br}`)
+      - traefik.http.routers.supabase-http.middlewares=supabase-redirect
+      - traefik.http.routers.supabase-http.service=supabase
+      - traefik.http.routers.supabase.entrypoints=https
+      - traefik.http.routers.supabase.rule=Host(`${SUPABASE_HOST:-supabase.homo.grupoazuos.com.br}`)
+      - traefik.http.routers.supabase.tls=true
+      - traefik.http.routers.supabase.tls.certresolver=letsencrypt
+      - traefik.http.routers.supabase.middlewares=supabase-headers
+      - traefik.http.routers.supabase.service=supabase
+      - traefik.http.services.supabase.loadbalancer.server.port=8000

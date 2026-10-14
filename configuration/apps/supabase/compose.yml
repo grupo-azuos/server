@@ -1,0 +1,378 @@
+# =============================================================================
+#  supabase/compose.yml  --  BACKEND COMPLETO (Postgres + Auth + Storage + API)
+# -----------------------------------------------------------------------------
+#  Derivado do supabase-compose.yml do TestLab, adaptado para servidor:
+#
+#    * Nenhuma credencial embutida. Tudo vem do .env que o Ansible gera a
+#      partir de supabase.env.j2 (tag supabase do deploy.yml).
+#    * As portas publicadas NAO sao liberadas no firewalld (ver o bloco [base]
+#      do playbook). Postgres e Kong ficam alcancaveis so de dentro do
+#      servidor: por tunel SSH, ou publicados num dominio pelo Coolify.
+#    * O Kong tambem entra na rede externa "proxy", para que um reverse proxy
+#      (o traefik do Coolify, por exemplo) o alcance pelo nome "kong".
+#
+#  Servico por servico:
+#    db         Postgres 15 com as extensoes do Supabase. Fonte da verdade.
+#    auth       GoTrue. Signup/login/JWT/recuperacao de senha.
+#    rest       PostgREST. Cada tabela/view vira endpoint REST, com RLS.
+#    realtime   Websocket que faz streaming do WAL do Postgres.   [extras]
+#    storage    API de arquivos. Bytes no volume supabase-storage-data.
+#    imgproxy   Redimensiona/converte imagem para o storage.      [extras]
+#    meta       API de metadados do banco. Alimenta o Studio.
+#    studio     Painel web.
+#    functions  Edge Runtime (Deno).                              [extras]
+#    kong       API Gateway. Unico ponto de entrada da stack.
+#
+#  Os servicos marcados [extras] so sobem com COMPOSE_PROFILES=extras.
+# =============================================================================
+name: supabase
+
+services:
+
+  # ===========================================================================
+  #  BANCO DE DADOS
+  # ===========================================================================
+  db:
+    image: supabase/postgres:15.14.1.171
+    container_name: supabase-db
+    restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      - -c
+      - log_min_messages=fatal
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGPORT: ${POSTGRES_PORT}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+      # Lidos pelos scripts de init em config/db/
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXP: ${JWT_EXPIRY}
+    ports:
+      # Porta fechada no firewalld. Para acessar de fora, tunel SSH:
+      #   ssh -L 5432:127.0.0.1:5432 root@servidor
+      - "${POSTGRES_PORT_EXTERNAL}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # Scripts rodados UMA VEZ, na criacao do volume (ordem alfabetica):
+      - ./config/db/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:ro
+      - ./config/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:ro
+      - ./config/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:ro
+    networks: [supabase]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # ===========================================================================
+  #  AUTENTICACAO (GoTrue)
+  # ===========================================================================
+  auth:
+    image: supabase/gotrue:v2.197.0
+    container_name: supabase-auth
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${API_EXTERNAL_URL}
+
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:5432/${POSTGRES_DB}
+
+      GOTRUE_SITE_URL: ${SITE_URL}
+      GOTRUE_URI_ALLOW_LIST: ${ADDITIONAL_REDIRECT_URLS}
+      GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP}
+
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: ${JWT_EXPIRY}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_ISSUER: supabase
+
+      # ---- E-mail ----
+      # Sem SMTP configurado, GOTRUE_MAILER_AUTOCONFIRM=true e o unico jeito do
+      # usuario nascer utilizavel. Preenchendo SMTP_HOST, desligue o autoconfirm
+      # no .env para ter confirmacao de e-mail de verdade.
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: ${ENABLE_EMAIL_SIGNUP}
+      GOTRUE_MAILER_AUTOCONFIRM: ${ENABLE_EMAIL_AUTOCONFIRM}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL}
+      GOTRUE_SMTP_HOST: ${SMTP_HOST}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT}
+      GOTRUE_SMTP_USER: ${SMTP_USER}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME}
+      GOTRUE_SMTP_MAX_FREQUENCY: 1s
+
+      # Telefone/SMS desligado (nao ha provider)
+      GOTRUE_EXTERNAL_PHONE_ENABLED: ${ENABLE_PHONE_SIGNUP}
+      GOTRUE_SMS_AUTOCONFIRM: ${ENABLE_PHONE_AUTOCONFIRM}
+
+      # Login anonimo
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: ${ENABLE_ANONYMOUS_USERS}
+
+      GOTRUE_LOG_LEVEL: info
+    networks: [supabase]
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ===========================================================================
+  #  API REST (PostgREST)
+  # ===========================================================================
+  rest:
+    image: postgrest/postgrest:v16.3
+    container_name: supabase-rest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:5432/${POSTGRES_DB}
+      PGRST_DB_SCHEMAS: public,storage,graphql_public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
+      PGRST_APP_SETTINGS_JWT_EXP: ${JWT_EXPIRY}
+    command: ["postgrest"]
+    networks: [supabase]
+
+  # ===========================================================================
+  #  REALTIME (websocket sobre o WAL do Postgres)
+  #  O hostname PRECISA ter um ponto: exigencia do cluster Erlang. Se mudar
+  #  este container_name, mude tambem as duas URLs em config/api/kong.yml.
+  # ===========================================================================
+  realtime:
+    profiles: [extras]
+    image: supabase/realtime:v2.135.1
+    container_name: realtime-dev.supabase-realtime
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: "4000"
+      DB_HOST: ${POSTGRES_HOST}
+      DB_PORT: "5432"
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+      DB_AFTER_CONNECT_QUERY: SET search_path TO _realtime
+      DB_ENC_KEY: ${REALTIME_ENC_KEY}
+      API_JWT_SECRET: ${JWT_SECRET}
+      METRICS_JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      ERL_AFLAGS: -proto_dist inet_tcp
+      DNS_NODES: "''"
+      RLIMIT_NOFILE: "10000"
+      APP_NAME: realtime
+      SEED_SELF_HOST: "true"
+      RUN_JANITOR: "true"
+    networks: [supabase]
+
+  # ===========================================================================
+  #  STORAGE  (metadados no Postgres, bytes no volume supabase-storage-data)
+  # ===========================================================================
+  storage:
+    image: supabase/storage-api:v1.77.0
+    container_name: supabase-storage
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      rest:
+        condition: service_started
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      POSTGREST_URL: http://rest:3000
+      # nomes antigo e novo da mesma coisa: cobre qualquer versao da imagem
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:5432/${POSTGRES_DB}
+      DB_INSTALL_ROLES: "false"
+
+      FILE_SIZE_LIMIT: ${STORAGE_FILE_SIZE_LIMIT}
+      TENANT_ID: ${STORAGE_TENANT_ID}
+      REGION: ${STORAGE_REGION}
+
+      # ---- Backend de arquivo: os bytes vao para o volume storage-data ----
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      # exigido pela imagem mesmo no modo file; valor ignorado
+      GLOBAL_S3_BUCKET: stub
+
+      # ---- Transformacao de imagem (depende do imgproxy, profile extras) ----
+      ENABLE_IMAGE_TRANSFORMATION: ${ENABLE_IMAGE_TRANSFORMATION}
+      IMGPROXY_URL: http://imgproxy:5001
+
+      # ---- API S3 (http://<servidor>:<KONG_HTTP_PORT>/storage/v1/s3, regiao = REGION) ----
+      # O Kong corta /storage/v1 antes de repassar; o prefixo faz a assinatura SigV4
+      # do cliente (calculada com o caminho completo) bater.
+      S3_PROTOCOL_ACCESS_KEY_ID: ${S3_PROTOCOL_ACCESS_KEY_ID}
+      S3_PROTOCOL_ACCESS_KEY_SECRET: ${S3_PROTOCOL_ACCESS_KEY_SECRET}
+      S3_PROTOCOL_PREFIX: ${S3_PROTOCOL_PREFIX}
+    volumes:
+      - storage-data:/var/lib/storage
+    networks: [supabase]
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:5000/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  imgproxy:
+    profiles: [extras]
+    image: darthsim/imgproxy:v4.0.14
+    container_name: supabase-imgproxy
+    restart: unless-stopped
+    environment:
+      IMGPROXY_BIND: ":5001"
+      IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
+      IMGPROXY_USE_ETAG: "true"
+      IMGPROXY_ENABLE_WEBP_DETECTION: "true"
+    volumes:
+      - storage-data:/var/lib/storage:ro
+    networks: [supabase]
+
+  # ===========================================================================
+  #  METADADOS DO BANCO (alimenta o Studio)
+  # ===========================================================================
+  meta:
+    image: supabase/postgres-meta:v0.99.0
+    container_name: supabase-meta
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PG_META_PORT: "8080"
+      PG_META_DB_HOST: ${POSTGRES_HOST}
+      PG_META_DB_PORT: "5432"
+      PG_META_DB_NAME: ${POSTGRES_DB}
+      PG_META_DB_USER: supabase_admin
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+    networks: [supabase]
+
+  # ===========================================================================
+  #  EDGE FUNCTIONS (Deno)
+  # ===========================================================================
+  functions:
+    profiles: [extras]
+    image: supabase/edge-runtime:v1.76.2
+    container_name: supabase-functions
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:5432/${POSTGRES_DB}
+      VERIFY_JWT: ${FUNCTIONS_VERIFY_JWT}
+    volumes:
+      - ./config/functions:/home/deno/functions:ro
+    command: ["start", "--main-service", "/home/deno/functions/main"]
+    networks: [supabase]
+
+  # ===========================================================================
+  #  STUDIO (painel web)
+  # ===========================================================================
+  studio:
+    image: supabase/studio:2026.09.14-sha-4dd8a95
+    container_name: supabase-studio
+    restart: unless-stopped
+    depends_on:
+      meta:
+        condition: service_started
+    environment:
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+      DEFAULT_ORGANIZATION_NAME: ${STUDIO_DEFAULT_ORGANIZATION}
+      DEFAULT_PROJECT_NAME: ${STUDIO_DEFAULT_PROJECT}
+
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+
+      # Sem stack de analytics/logflare
+      NEXT_PUBLIC_ENABLE_LOGS: "false"
+      NEXT_ANALYTICS_BACKEND_PROVIDER: postgres
+      HOSTNAME: 0.0.0.0
+    networks: [supabase]
+
+  # ===========================================================================
+  #  API GATEWAY (Kong) -- o unico ponto de entrada da stack
+  # ===========================================================================
+  kong:
+    image: kong:3.9
+    container_name: supabase-kong
+    restart: unless-stopped
+    depends_on:
+      auth:
+        condition: service_started
+      rest:
+        condition: service_started
+      storage:
+        condition: service_started
+      studio:
+        condition: service_started
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /tmp/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      # Usadas na expansao do kong.yml pelo entrypoint abaixo
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      DASHBOARD_USERNAME: ${DASHBOARD_USERNAME}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
+      CORS_ORIGIN: ${KONG_CORS_ORIGIN}
+    ports:
+      - "${KONG_HTTP_PORT}:8000"
+      - "${KONG_HTTPS_PORT}:8443"
+    volumes:
+      - ./config/api/kong.yml:/home/kong/temp.yml:ro
+    # Expande as variaveis do template e so entao inicia o Kong
+    entrypoint: >
+      bash -c 'eval "echo \"$$(cat /home/kong/temp.yml)\"" > /tmp/kong.yml
+      && /docker-entrypoint.sh kong docker-start'
+    networks:
+      supabase:
+      # Rede compartilhada: e por aqui que um reverse proxy externo alcanca
+      # http://kong:8000 sem passar pela porta publicada no host.
+      proxy:
+
+volumes:
+  db-data:
+    name: supabase-db-data
+  storage-data:
+    name: supabase-storage-data
+
+networks:
+  supabase:
+    name: ${NETWORK_NAME}
+  proxy:
+    external: true

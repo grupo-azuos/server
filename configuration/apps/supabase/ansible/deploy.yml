@@ -1,0 +1,64 @@
+---
+# =========================================================================
+# === SUPABASE (homo, /opt/supabase) ===
+# =========================================================================
+# Os containers só são recriados quando o compose, as configs ou o .env mudam.
+# Rode antes com --check --diff: o diff do .env mostra exatamente o que muda.
+
+- name: "[supabase] Criar diretório de deploy"
+  file:
+    path: "{{ supabase_path }}"
+    state: directory
+    mode: '0755'
+  tags: [supabase]
+
+- name: "[supabase] Implantar configs (kong, init do banco, functions)"
+  copy:
+    src: "{{ apps_dir }}/supabase/config/"
+    dest: "{{ supabase_path }}/config/"
+    mode: '0644'
+    directory_mode: '0755'
+  register: supabase_config
+  tags: [supabase]
+
+- name: "[supabase] Copiar docker-compose do Supabase"
+  copy:
+    src: "{{ apps_dir }}/supabase/compose.yml"
+    dest: "{{ supabase_path }}/docker-compose.yml"
+    mode: '0644'
+  register: supabase_compose
+  tags: [supabase]
+
+- name: "[supabase] Gerar .env do Supabase"
+  template:
+    src: "{{ apps_dir }}/supabase/supabase.env.j2"
+    dest: "{{ supabase_path }}/.env"
+    mode: '0600'
+  register: supabase_env
+  tags: [supabase]
+
+- name: "[supabase] Abrir porta do Kong no firewall (8001)"
+  firewalld:
+    port: 8001/tcp
+    permanent: yes
+    state: enabled
+    immediate: yes
+  failed_when: false
+  tags: [supabase]
+
+# O Kong entra na rede externa "proxy" (ver compose.yml).
+- name: "[supabase] Garantir a rede docker proxy"
+  command: docker network create proxy
+  register: proxy_net
+  changed_when: proxy_net.rc == 0
+  failed_when: proxy_net.rc != 0 and 'already exists' not in proxy_net.stderr
+  tags: [supabase]
+
+- name: "[supabase] Subir/recriar containers do Supabase"
+  command: docker compose up -d --force-recreate
+  args:
+    chdir: "{{ supabase_path }}"
+  environment:
+    COMPOSE_PROFILES: "{{ supabase_profiles | default('') }}"
+  when: supabase_config is changed or supabase_compose is changed or supabase_env is changed or supabase_force | default(false) | bool
+  tags: [supabase]
