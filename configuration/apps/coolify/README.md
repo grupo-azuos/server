@@ -104,6 +104,41 @@ Depois de mudar as labels: **Save** e **Restart** do app. O restart recria o con
 Os demais apps do prod (fiscal, trilha, crm, certmonitor, cs, onecode-automation, azuosclip) usam as labels geradas
 pelo Coolify. Elas também são autocontidas.
 
+## Traefik do homo: o que muda num app
+
+O homo tem **outro Traefik**, outro Coolify e outros certificados. Um app copiado do prod (ou um compose/labels
+tirados do repo do app) **não funciona no homo sem trocar domínio e labels**. Pior: com o domínio do prod, o Traefik
+do homo tenta emitir certificado para `app.grupoazuos.com.br`, o Let's Encrypt chega no prod (não no homo), a
+validação falha e, depois de 5 falhas em 1 hora, o domínio fica bloqueado por rate limit (aconteceu em 2026-10-13).
+
+```text
+https://app.homo.grupoazuos.com.br ─▶ prod (passthrough por SNI, sem abrir o TLS) ─▶ túnel NetBird ─▶ Traefik do homo ─▶ app
+```
+
+Checklist para um app no homo (labels manuais ou compose):
+
+| O quê | prod | homo |
+|---|---|---|
+| Domínio (`Host(...)` das labels, campo Domains) | `app.grupoazuos.com.br` | **`app.homo.grupoazuos.com.br`** |
+| `traefik.docker.network` | `prod` | **`coolify`** |
+| `loadbalancer.server.port` | porta em que o app escuta no prod | porta em que o app escuta **no homo** (confira no log de boot; hoje admin-console 4000, public-api 4001, paralegal 4002) |
+| `forwardauth.address` | `http://admin-console:3000/api/auth/verify` | **`http://admin-console:4000/api/auth/verify`** |
+| Nomes dos middlewares | `<app>-headers`, `<app>-rate`... | os mesmos, definidos **nas labels do próprio app** do homo (nada de `@docker` de outro container) |
+| `certresolver` | `letsencrypt` | `letsencrypt` (no homo emite por TLS-ALPN pelo túnel) |
+
+E nas variáveis de ambiente do app, tudo que é URL ou cookie também muda:
+
+| Variável típica | homo |
+|---|---|
+| `LOGIN_URL`, `*_URL` públicas | `https://<app>.homo.grupoazuos.com.br` (https: o admin-console não sobe com http) |
+| `API_CORS_ORIGIN` | só os domínios `*.homo.grupoazuos.com.br`, nunca os do prod nem IP da LAN |
+| `COOKIE_DOMAIN` | `.homo.grupoazuos.com.br` |
+| URL de outro sistema (ex.: `ADMIN_CONSOLE_URL`) | o do homo (`http://admin-console:4000` pela rede interna) |
+| Supabase / S3 | o do homo (ver [apps/supabase](../supabase/README.md)), nunca o Cloud de produção |
+
+Para conferir depois do deploy: `https://<app>.homo.grupoazuos.com.br` abre com certificado válido, e
+**Servers → localhost → Proxy → Logs** do homo não mostra `middleware ... does not exist` nem erro de ACME.
+
 ## Diagnóstico rápido
 
 | Sintoma | Causa provável |
