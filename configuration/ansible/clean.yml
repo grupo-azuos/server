@@ -1,0 +1,41 @@
+---
+- name: Clean / Teardown Server Services
+  hosts: all
+  become: yes
+  vars:
+    apps_dir: "{{ playbook_dir }}/../apps"
+    coolify_proxy_path: "/data/coolify/proxy"
+    netbird_path: "/opt/netbird"
+    supabase_path: "/opt/supabase"
+
+  tasks:
+    # =========================================================================
+    # === TÚNEL ===
+    # =========================================================================
+    - name: "[tunnel] Teardown rota *.homo no prod"
+      include_tasks: "{{ apps_dir }}/coolify/ansible/clean.tunnel-prod.yml"
+      when: server == 'prod'
+      tags: [tunnel]
+
+    # =========================================================================
+    # === NETBIRD CLIENT ===
+    # =========================================================================
+    - name: "[netbird-client] Teardown NetBird Client"
+      include_tasks: "{{ apps_dir }}/netbird/ansible/clean.client.yml"
+      tags: [netbird-client]
+
+    # =========================================================================
+    # === NETBIRD SERVER ===
+    # =========================================================================
+    - name: "[netbird] Teardown NetBird Server"
+      include_tasks: "{{ apps_dir }}/netbird/ansible/clean.server.yml"
+      when: server == 'prod'
+      tags: [netbird]
+
+    # =========================================================================
+    # === SUPABASE ===
+    # =========================================================================
+    - name: "[supabase] Teardown Supabase"
+      include_tasks: "{{ apps_dir }}/supabase/ansible/clean.yml"
+      when: server == 'homo'
+      tags: [supabase]

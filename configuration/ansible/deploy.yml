@@ -1,0 +1,63 @@
+---
+# Rode da raiz do repo, uma etapa por vez (ver README):
+#   ansible-playbook configuration/ansible/deploy.yml --tags <etapa>
+# Só um servidor: acrescente --limit prod (ou homo).
+- name: Deploy Server Infrastructure
+  hosts: all
+  become: yes
+  vars:
+    apps_dir: "{{ playbook_dir }}/../apps"
+    coolify_data_path: "/data/coolify"
+    coolify_proxy_path: "/data/coolify/proxy"
+    netbird_path: "/opt/netbird"
+    supabase_path: "/opt/supabase"
+    netbird_server_version: "0.80.0"
+    netbird_dashboard_version: "v2.94.0"
+    netbird_domain: "netbird.{{ domain }}"
+    # *.homo.<domain> vai (TLS intacto) do prod para o homo
+    homo_domain: "homo.{{ domain }}"
+    # Faixa de onde o NetBird sorteia a rede da VPN; o homo aceita PROXY protocol só dela.
+    vpn_cidr: "100.64.0.0/10"
+    # IP do homo na VPN. Vazio = descoberto na etapa tunnel (netbird status no homo).
+    homo_vpn_ip: ""
+
+  tasks:
+    # -------------------------------------------------------------------------
+    # Coolify (prod e homo)
+    # -------------------------------------------------------------------------
+    - name: "[coolify] Deploy Coolify PaaS"
+      include_tasks: "{{ apps_dir }}/coolify/ansible/deploy.yml"
+      tags: [coolify]
+
+    # -------------------------------------------------------------------------
+    # NetBird
+    # -------------------------------------------------------------------------
+    - name: "[netbird] Deploy NetBird Server"
+      include_tasks: "{{ apps_dir }}/netbird/ansible/deploy.server.yml"
+      when: server == 'prod'
+      tags: [netbird]
+
+    - name: "[netbird-client] Conectar NetBird Client"
+      include_tasks: "{{ apps_dir }}/netbird/ansible/deploy.client.yml"
+      tags: [netbird-client]
+
+    # -------------------------------------------------------------------------
+    # Supabase self-hosted (homo, /opt/supabase)
+    # -------------------------------------------------------------------------
+    - name: "[supabase] Deploy Supabase"
+      include_tasks: "{{ apps_dir }}/supabase/ansible/deploy.yml"
+      when: server == 'homo'
+      tags: [supabase]
+
+    # -------------------------------------------------------------------------
+    # Túnel *.homo: o homo roda antes, porque o prod precisa do IP dele na VPN
+    # -------------------------------------------------------------------------
+    - name: "[tunnel] Preparar Traefik do homo"
+      include_tasks: "{{ apps_dir }}/coolify/ansible/deploy.tunnel-homo.yml"
+      when: server == 'homo'
+      tags: [tunnel]
+
+    - name: "[tunnel] Encaminhar *.homo no Traefik do prod"
+      include_tasks: "{{ apps_dir }}/coolify/ansible/deploy.tunnel-prod.yml"
+      when: server == 'prod'
+      tags: [tunnel]
