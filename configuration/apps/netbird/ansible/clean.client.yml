@@ -1,0 +1,9 @@
+---
+# =========================================================================
+# === NETBIRD CLIENT CLEAN / TEARDOWN ===
+# =========================================================================
+
+- name: "[netbird-client] Desconectar e parar NetBird Client"
+  command: netbird down
+  failed_when: false
+  tags: [netbird-client]

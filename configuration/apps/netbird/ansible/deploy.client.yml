@@ -1,0 +1,49 @@
+---
+# =========================================================================
+# === NETBIRD CLIENT (PARA INGRESSAR NÓS NA VPN) ===
+# =========================================================================
+# Instalado no host (não em container): a rota para a VPN fica no host e o
+# Traefik, que sai pela rede do host, alcança os outros peers.
+
+- name: "[netbird-client] Conferir setup key"
+  assert:
+    that: netbird_setup_key | default('') | length > 0
+    fail_msg: "Crie uma Setup Key no painel https://{{ netbird_domain }} e preencha netbird_setup_key no hosts.ini"
+  tags: [netbird-client]
+
+- name: "[netbird-client] Instalar NetBird Client oficial (se não instalado)"
+  shell: curl -fsSL https://pkgs.netbird.io/install.sh | sh
+  args:
+    creates: /usr/bin/netbird
+  tags: [netbird-client]
+
+- name: "[netbird-client] Garantir resolução de loopback do NetBird no /etc/hosts (prod)"
+  lineinfile:
+    path: /etc/hosts
+    line: "127.0.0.1 {{ netbird_domain }}"
+    state: present
+  when: server == 'prod'
+  tags: [netbird-client]
+
+- name: "[netbird-client] Iniciar e habilitar serviço do NetBird"
+  systemd:
+    name: netbird
+    state: started
+    enabled: yes
+  tags: [netbird-client]
+
+- name: "[netbird-client] Verificar conexão"
+  command: netbird status
+  register: nb_status
+  changed_when: false
+  failed_when: false
+  tags: [netbird-client]
+
+- name: "[netbird-client] Conectar ao servidor NetBird com Setup Key"
+  command: >
+    netbird up
+    --management-url {{ netbird_mgmt_url | default('https://' + netbird_domain) }}
+    --setup-key {{ netbird_setup_key }}
+  when: "'Management: Connected' not in nb_status.stdout"
+  no_log: true
+  tags: [netbird-client]

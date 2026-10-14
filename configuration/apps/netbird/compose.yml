@@ -1,0 +1,63 @@
+networks:
+  coolify:
+    external: true
+
+services:
+  netbird-dashboard:
+    image: netbirdio/dashboard:${NETBIRD_DASHBOARD_VERSION}
+    container_name: netbird-dashboard
+    restart: unless-stopped
+    networks:
+      - coolify
+    env_file:
+      - ./dashboard.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=coolify"
+      - "traefik.http.routers.nb-dash.rule=Host(`${NETBIRD_DOMAIN}`)"
+      - "traefik.http.routers.nb-dash.entrypoints=https"
+      - "traefik.http.routers.nb-dash.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.nb-dash.priority=1"
+      - "traefik.http.routers.nb-dash.service=nb-dash"
+      - "traefik.http.services.nb-dash.loadbalancer.server.port=80"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "2"
+
+  netbird-server:
+    image: netbirdio/netbird-server:${NETBIRD_SERVER_VERSION}
+    container_name: netbird-server
+    restart: unless-stopped
+    networks:
+      - coolify
+    ports:
+      - "3478:3478/udp"
+    volumes:
+      - ./config.yaml:/etc/netbird/config.yaml
+      - /opt/netbird/data:/var/lib/netbird
+    command: ["--config", "/etc/netbird/config.yaml"]
+    environment:
+      - NETBIRD_CONFIG=/etc/netbird/config.yaml
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=coolify"
+      # gRPC (Signal e Management) em h2c
+      - "traefik.http.routers.nb-grpc.rule=Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/signalexchange.SignalExchange/`) || PathPrefix(`/management.ManagementService/`))"
+      - "traefik.http.routers.nb-grpc.entrypoints=https"
+      - "traefik.http.routers.nb-grpc.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.nb-grpc.service=nb-grpc"
+      - "traefik.http.services.nb-grpc.loadbalancer.server.port=80"
+      - "traefik.http.services.nb-grpc.loadbalancer.server.scheme=h2c"
+      # API, autenticação, Relay e WebSocket
+      - "traefik.http.routers.nb-api.rule=Host(`${NETBIRD_DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/oauth2`) || PathPrefix(`/relay`) || PathPrefix(`/ws-proxy`))"
+      - "traefik.http.routers.nb-api.entrypoints=https"
+      - "traefik.http.routers.nb-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.nb-api.service=nb-api"
+      - "traefik.http.services.nb-api.loadbalancer.server.port=80"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "2"

@@ -1,0 +1,97 @@
+# NetBird server + dashboard para colar no Coolify do prod
+# (Project → + New → Docker Compose Empty). Mesmo conteúdo do compose.yml, adaptado ao Coolify:
+# config.yaml inline, variáveis no próprio arquivo e sem container_name (o Coolify gerencia os nomes).
+# Alternativa sem Coolify: ansible-playbook ... --tags netbird (usa o compose.yml).
+#
+# Antes de colar:
+#   1. Troque netbird.grupoazuos.com.br se o domínio for outro.
+#   2. Troque os três GERAR_COM_OPENSSL por valores de: openssl rand -base64 32
+# No Coolify:
+#   - Deixe vazios os campos "Domains" dos dois serviços: o roteamento vem das labels abaixo.
+#   - Marque "Connect To Predefined Network" (o Traefik enxerga os containers pela rede `coolify`).
+
+volumes:
+  netbird-data:
+
+services:
+  netbird-dashboard:
+    image: netbirdio/dashboard:v2.94.0
+    restart: unless-stopped
+    environment:
+      - NETBIRD_MGMT_API_ENDPOINT=https://netbird.grupoazuos.com.br
+      - NETBIRD_MGMT_GRPC_API_ENDPOINT=https://netbird.grupoazuos.com.br
+      - AUTH_AUDIENCE=netbird-dashboard
+      - AUTH_CLIENT_ID=netbird-dashboard
+      - AUTH_CLIENT_SECRET=
+      - AUTH_AUTHORITY=https://netbird.grupoazuos.com.br/oauth2
+      - USE_AUTH0=false
+      - AUTH_SUPPORTED_SCOPES=openid profile email groups
+      - AUTH_REDIRECT_URI=/nb-auth
+      - AUTH_SILENT_REDIRECT_URI=/nb-silent-auth
+      - NGINX_SSL_PORT=443
+      - LETSENCRYPT_DOMAIN=none
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=coolify"
+      - "traefik.http.routers.nb-dash.rule=Host(`netbird.grupoazuos.com.br`)"
+      - "traefik.http.routers.nb-dash.entrypoints=https"
+      - "traefik.http.routers.nb-dash.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.nb-dash.priority=1"
+      - "traefik.http.routers.nb-dash.service=nb-dash"
+      - "traefik.http.services.nb-dash.loadbalancer.server.port=80"
+
+  netbird-server:
+    image: netbirdio/netbird-server:0.80.0
+    restart: unless-stopped
+    ports:
+      - "3478:3478/udp"
+    command: ["--config", "/etc/netbird/config.yaml"]
+    volumes:
+      - netbird-data:/var/lib/netbird
+      - type: bind
+        source: ./config.yaml
+        target: /etc/netbird/config.yaml
+        content: |
+          server:
+            listenAddress: ":80"
+            exposedAddress: "https://netbird.grupoazuos.com.br:443"
+            stunPorts:
+              - 3478
+            metricsPort: 9090
+            healthcheckAddress: ":9000"
+            logLevel: "info"
+            logFile: "console"
+            authSecret: "GERAR_COM_OPENSSL"
+            dataDir: "/var/lib/netbird"
+            auth:
+              issuer: "https://netbird.grupoazuos.com.br/oauth2"
+              signKeyRefreshEnabled: true
+              sessionCookieEncryptionKey: "GERAR_COM_OPENSSL"
+              dashboardRedirectURIs:
+                - "https://netbird.grupoazuos.com.br/nb-auth"
+                - "https://netbird.grupoazuos.com.br/nb-silent-auth"
+              cliRedirectURIs:
+                - "http://localhost:53000/"
+            reverseProxy:
+              trustedHTTPProxies:
+                - "172.16.0.0/12"
+                - "10.0.0.0/8"
+            store:
+              engine: "sqlite"
+              encryptionKey: "GERAR_COM_OPENSSL"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=coolify"
+      # gRPC (signal + management) em h2c
+      - "traefik.http.routers.nb-grpc.rule=Host(`netbird.grupoazuos.com.br`) && (PathPrefix(`/signalexchange.SignalExchange/`) || PathPrefix(`/management.ManagementService/`))"
+      - "traefik.http.routers.nb-grpc.entrypoints=https"
+      - "traefik.http.routers.nb-grpc.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.nb-grpc.service=nb-grpc"
+      - "traefik.http.services.nb-grpc.loadbalancer.server.port=80"
+      - "traefik.http.services.nb-grpc.loadbalancer.server.scheme=h2c"
+      # API, OAuth, relay e websocket
+      - "traefik.http.routers.nb-api.rule=Host(`netbird.grupoazuos.com.br`) && (PathPrefix(`/api`) || PathPrefix(`/oauth2`) || PathPrefix(`/relay`) || PathPrefix(`/ws-proxy`))"
+      - "traefik.http.routers.nb-api.entrypoints=https"
+      - "traefik.http.routers.nb-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.nb-api.service=nb-api"
+      - "traefik.http.services.nb-api.loadbalancer.server.port=80"
