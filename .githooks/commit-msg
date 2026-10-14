@@ -1,0 +1,19 @@
+#!/bin/sh
+# Mesmo padrão do commitlint do template, sem depender de Node:  [tipo](local): Mensagem
+# Ative uma vez por clone:  git config core.hooksPath .githooks
+types='feat|fix|refactor|test|docs|style|perf|build|ci|chore|merge'
+scopes='ansible|servers|coolify|netbird|rustdesk|supabase|docs|ci|git|claude'
+
+header=$(grep -v '^#' "$1" | sed '/^[[:space:]]*$/d' | head -n 1)
+
+fail() {
+  echo "commit-msg: $1" >&2
+  echo "  recebido: $header" >&2
+  echo "  formato:  [tipo](local): Mensagem   (ver .gitmessage)" >&2
+  exit 1
+}
+
+echo "$header" | grep -Eq "^\[($types)\]\(($scopes)\): .+$" || fail "cabeçalho fora do padrão, ou tipo/local desconhecido"
+case "$header" in *.) fail "a mensagem não termina com ponto" ;; esac
+[ "${#header}" -le 100 ] || fail "cabeçalho com mais de 100 caracteres"
+exit 0

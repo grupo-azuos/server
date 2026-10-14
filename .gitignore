@@ -1,0 +1,6 @@
+# Inventário real com IPs e segredos. O modelo versionado é o inventory.ini.
+configuration/servers/*/hosts.ini
+*.retry
+# RustDesk: .env real e chaves/banco gerados pelo servidor
+configuration/apps/rustdesk/.env
+configuration/apps/rustdesk/data/

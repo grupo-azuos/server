@@ -1,0 +1,40 @@
+[tipo](local): Mensagem
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FORMATO OBRIGATÓRIO:  [tipo](local): Mensagem
+#
+#   [feat](supabase): API S3 do Storage com chaves próprias
+#   [fix](coolify): Labels do admin-console apontam para a porta certa
+#   [docs](docs): Passo a passo do túnel do homo pelo painel
+#
+# TIPO
+#   feat      funcionalidade nova
+#   fix       correção de defeito
+#   refactor  muda a forma, não o comportamento
+#   test      só teste
+#   docs      só documentação
+#   style     só formatação, sem efeito em runtime
+#   perf      ganho de desempenho
+#   build     build, dependências, empacotamento
+#   ci        pipeline
+#   chore     manutenção que não cabe acima
+#   merge     fechamento de uma branch (todo merge precisa de -m)
+#
+# LOCAL
+#   ansible    configuration/ansible/ e ansible.cfg
+#   servers    configuration/servers/
+#   coolify    configuration/apps/coolify/
+#   netbird    configuration/apps/netbird/
+#   rustdesk   configuration/apps/rustdesk/
+#   supabase   configuration/apps/supabase/
+#   docs       .md na raiz
+#   ci         .github/
+#   git        .gitmessage, .githooks/, .gitattributes, .gitignore
+#   claude     .claude/ e CLAUDE.md
+#
+# MENSAGEM
+#   Em português. Primeira letra maiúscula. Sem ponto final.
+#   Diga o que a mudança FAZ, não onde você mexeu.
+#
+# Tocou dois locais? São dois commits. Nunca [feat](coolify,supabase).
+# ─────────────────────────────────────────────────────────────────────────────
