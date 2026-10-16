@@ -344,6 +344,10 @@ services:
       KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
       KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
       KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      # O Kong escuta na 8000 mas é publicado na KONG_HTTP_PORT. Sem o mapa, ele repassa
+      # X-Forwarded-Port: 8000, o storage remonta o Host com essa porta ao conferir a assinatura
+      # SigV4, e todo cliente S3 que assinou com a porta publicada leva SignatureDoesNotMatch.
+      KONG_PORT_MAPS: "${KONG_HTTP_PORT}:8000, ${KONG_HTTPS_PORT}:8443"
       # Usadas na expansao do kong.yml pelo entrypoint abaixo
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
