@@ -1,8 +1,15 @@
 # Os hosts.ini usam o grupo [servers] (mesmo formato do my-config). Aqui a
-# variável `server=` de cada linha vira os grupos prod e homo, usados pelo
+# variável `server=` de cada linha vira um grupo com o mesmo nome, usado pelo
 # deploy.yml e pelo --limit.
 plugin: ansible.builtin.constructed
 strict: true
 groups:
   prod: server == 'prod'
   homo: server == 'homo'
+  automacao: server == 'automacao'
+  crm: server == 'crm'
+  internos: server == 'internos'
+  monitoramento: server == 'monitoramento'
+  # Servidores com node-exporter + cAdvisor, coletados pelo Prometheus do monitoramento.
+  # Para monitorar o prod também, acrescente 'prod' na lista.
+  monitorados: server in ['homo', 'automacao', 'crm', 'internos', 'monitoramento']
