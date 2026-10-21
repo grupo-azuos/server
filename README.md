@@ -20,6 +20,13 @@ O desafio do Let's Encrypt é o TLS-ALPN (porta 443), o único que atravessa o p
 |---|---|---|
 | `prod` | VPS pública: Coolify, NetBird server + dashboard, agente NetBird, RustDesk | [servers/prod](configuration/servers/prod/README.md) |
 | `homo` | Homologação: Coolify, agente NetBird, Supabase self-hosted | [servers/homo](configuration/servers/homo/README.md) |
+| `automacao` | Automações: agente NetBird, exporters | [servers/automacao](configuration/servers/automacao/README.md) |
+| `crm` | CRM: agente NetBird, exporters | [servers/crm](configuration/servers/crm/README.md) |
+| `internos` | Sistemas internos: agente NetBird, exporters | [servers/internos](configuration/servers/internos/README.md) |
+| `monitoramento` | Prometheus + Grafana (só pela VPN), agente NetBird, exporters | [servers/monitoramento](configuration/servers/monitoramento/README.md) |
+
+Todos entram no NetBird. Os exporters (node-exporter + cAdvisor) rodam em todos, menos no prod, e o
+Prometheus do `monitoramento` coleta os dados pela VPN: [apps/monitoring](configuration/apps/monitoring/README.md).
 
 ## Preparação (uma vez)
 
@@ -27,11 +34,12 @@ O desafio do Let's Encrypt é o TLS-ALPN (porta 443), o único que atravessa o p
 brew install ansible             # ou: sudo dnf install ansible-core
 cp configuration/servers/prod/inventory.ini configuration/servers/prod/hosts.ini
 cp configuration/servers/homo/inventory.ini configuration/servers/homo/hosts.ini
+# servidores novos: o mesmo para automacao, crm, internos e monitoramento
 ```
 
 Preencha os `hosts.ini` (ignorados pelo git): IP, usuário, domínio e segredos de cada servidor, no mesmo
-formato do my-config (`[servers]` + uma linha por host). A variável `server=prod|homo` de cada linha vira
-os grupos `prod` e `homo` (`configuration/servers/groups.yml`). Variáveis não secretas comuns (versões,
+formato do my-config (`[servers]` + uma linha por host). A variável `server=` de cada linha vira
+o grupo de mesmo nome (`configuration/servers/groups.yml`), e o grupo `monitorados` diz quem é monitorado. Variáveis não secretas comuns (versões,
 caminhos, faixa da VPN) ficam no `vars:` de `configuration/ansible/deploy.yml`.
 
 | Pasta | Conteúdo |
@@ -41,7 +49,7 @@ caminhos, faixa da VPN) ficam no `vars:` de `configuration/ansible/deploy.yml`.
 | `configuration/apps/coolify/README.md` | Proxy do Traefik, modelo de labels, diagnóstico e histórico de correções |
 | `configuration/servers/<servidor>/` | `hosts.ini` (real, fora do git), `inventory.ini` (modelo) e README |
 
-Todos os comandos rodam da raiz do repo; o `ansible.cfg` já carrega os dois inventários.
+Todos os comandos rodam da raiz do repo; o `ansible.cfg` já carrega todos os inventários (um `hosts.ini` que ainda não existe só gera aviso).
 
 **Commits:** formato `[tipo](local): Mensagem`, igual ao template da casa (tipos e locais em `.gitmessage`). Uma vez
 por clone:
@@ -50,7 +58,7 @@ por clone:
 git config core.hooksPath .githooks     # recusa commit fora do padrão
 git config commit.template .gitmessage  # mostra o modelo no editor
 ```
-Só um servidor: acrescente `--limit prod` ou `--limit homo`.
+Só um servidor: acrescente `--limit <servidor>` (`prod`, `homo`, `automacao`, `crm`, `internos`, `monitoramento`).
 
 ## Etapas
 
@@ -132,6 +140,21 @@ curl https://teste.homo.<domain>       # whoami: X-Real-Ip / X-Forwarded-For com
 ```
 
 Se quiser, feche as portas 80/443 públicas do homo no firewall; o tráfego (e o desafio ACME) chega só pelo túnel.
+
+### 8. Servidores novos e monitoramento
+
+Para `automacao`, `crm`, `internos` e `monitoramento` (sem Coolify): Docker, agente NetBird (com a mesma Setup
+Key) e exporters. Depois, Prometheus + Grafana no monitoramento:
+
+```bash
+ansible-playbook configuration/ansible/deploy.yml --tags docker
+ansible-playbook configuration/ansible/deploy.yml --tags netbird-client
+ansible-playbook configuration/ansible/deploy.yml --tags exporters
+ansible-playbook configuration/ansible/deploy.yml --tags monitoring --limit monitoramento
+```
+
+A etapa `coolify` agora só roda no prod e no homo. Detalhes e dashboards: [apps/monitoring](configuration/apps/monitoring/README.md).
+Conferir: `http://<IP do monitoramento no NetBird>:9090/targets` com todos `UP`, e o Grafana em `:3000`.
 
 ## Cuidados
 
