@@ -7,6 +7,8 @@
     coolify_proxy_path: "/data/coolify/proxy"
     netbird_path: "/opt/netbird"
     supabase_path: "/opt/supabase"
+    monitoring_path: "/opt/monitoring"
+    exporters_path: "/opt/exporters"
 
   tasks:
     # =========================================================================
@@ -39,3 +41,16 @@
       include_tasks: "{{ apps_dir }}/supabase/ansible/clean.yml"
       when: server == 'homo'
       tags: [supabase]
+
+    # =========================================================================
+    # === MONITORAMENTO ===
+    # =========================================================================
+    - name: "[monitoring] Teardown Prometheus + Grafana"
+      include_tasks: "{{ apps_dir }}/monitoring/ansible/clean.yml"
+      when: server == 'monitoramento'
+      tags: [monitoring]
+
+    - name: "[exporters] Teardown node-exporter + cAdvisor"
+      include_tasks: "{{ apps_dir }}/monitoring/ansible/clean.exporters.yml"
+      when: inventory_hostname in groups['monitorados'] | default([])
+      tags: [exporters]

@@ -1,7 +1,7 @@
 ---
 # Rode da raiz do repo, uma etapa por vez (ver README):
 #   ansible-playbook configuration/ansible/deploy.yml --tags <etapa>
-# Só um servidor: acrescente --limit prod (ou homo).
+# Só um servidor: acrescente --limit <servidor> (prod, homo, automacao, crm, internos, monitoramento).
 - name: Deploy Server Infrastructure
   hosts: all
   become: yes
@@ -11,6 +11,8 @@
     coolify_proxy_path: "/data/coolify/proxy"
     netbird_path: "/opt/netbird"
     supabase_path: "/opt/supabase"
+    monitoring_path: "/opt/monitoring"
+    exporters_path: "/opt/exporters"
     netbird_server_version: "0.80.0"
     netbird_dashboard_version: "v2.94.0"
     netbird_domain: "netbird.{{ domain }}"
@@ -27,7 +29,16 @@
     # -------------------------------------------------------------------------
     - name: "[coolify] Deploy Coolify PaaS"
       include_tasks: "{{ apps_dir }}/coolify/ansible/deploy.yml"
+      when: server in ['prod', 'homo']
       tags: [coolify]
+
+    # -------------------------------------------------------------------------
+    # Docker (servidores sem Coolify)
+    # -------------------------------------------------------------------------
+    - name: "[docker] Instalar Docker"
+      include_tasks: "tasks/docker.yml"
+      when: server not in ['prod', 'homo']
+      tags: [docker]
 
     # -------------------------------------------------------------------------
     # NetBird
@@ -61,3 +72,16 @@
       include_tasks: "{{ apps_dir }}/coolify/ansible/deploy.tunnel-prod.yml"
       when: server == 'prod'
       tags: [tunnel]
+
+    # -------------------------------------------------------------------------
+    # Monitoramento: exporters nos monitorados, Prometheus + Grafana no monitoramento
+    # -------------------------------------------------------------------------
+    - name: "[exporters] Deploy node-exporter + cAdvisor"
+      include_tasks: "{{ apps_dir }}/monitoring/ansible/deploy.exporters.yml"
+      when: inventory_hostname in groups['monitorados'] | default([])
+      tags: [exporters]
+
+    - name: "[monitoring] Deploy Prometheus + Grafana"
+      include_tasks: "{{ apps_dir }}/monitoring/ansible/deploy.yml"
+      when: server == 'monitoramento'
+      tags: [monitoring]

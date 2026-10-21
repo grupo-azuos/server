@@ -1,0 +1,18 @@
+---
+# =========================================================================
+# === DOCKER (SERVIDORES SEM COOLIFY) ===
+# =========================================================================
+# No prod e no homo quem instala o Docker é o instalador do Coolify.
+
+- name: "[docker] Instalar Docker pelo script oficial (se não instalado)"
+  shell: curl -fsSL https://get.docker.com | sh
+  args:
+    creates: /usr/bin/docker
+  tags: [docker]
+
+- name: "[docker] Iniciar e habilitar o Docker"
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+  tags: [docker]
