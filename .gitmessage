@@ -27,6 +27,7 @@
 #   netbird    configuration/apps/netbird/
 #   rustdesk   configuration/apps/rustdesk/
 #   supabase   configuration/apps/supabase/
+#   monitoring configuration/apps/monitoring/
 #   docs       .md na raiz
 #   ci         .github/
 #   git        .gitmessage, .githooks/, .gitattributes, .gitignore
