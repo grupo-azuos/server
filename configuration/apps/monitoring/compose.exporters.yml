@@ -1,0 +1,36 @@
+# Agentes de métricas, em todos os servidores monitorados (/opt/exporters).
+# Rede do host e escuta só no IP do NetBird (VPN_IP): o Prometheus do
+# monitoramento coleta pela VPN e nada fica exposto no IP público.
+services:
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: node-exporter
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    command:
+      - "--path.rootfs=/host"
+      - "--web.listen-address=${VPN_IP:?}:9100"
+    volumes:
+      - /:/host:ro,rslave
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    devices:
+      - /dev/kmsg
+    # 9101, não 8080: o Traefik do Coolify publica a 8080 no prod e no homo
+    command:
+      - "--listen_ip=${VPN_IP:?}"
+      - "--port=9101"
+      - "--docker_only=true"
+      - "--housekeeping_interval=30s"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro

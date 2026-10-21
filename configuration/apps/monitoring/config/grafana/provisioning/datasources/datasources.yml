@@ -1,0 +1,10 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    # PROMETHEUS_URL vem do compose (IP do monitoramento no NetBird)
+    url: $PROMETHEUS_URL
+    isDefault: true
+    editable: true

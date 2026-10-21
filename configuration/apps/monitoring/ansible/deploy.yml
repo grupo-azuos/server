@@ -1,0 +1,120 @@
+---
+# =========================================================================
+# === MONITORING (PROMETHEUS + GRAFANA) ===
+# =========================================================================
+# Só no servidor monitoramento. Coleta os exporters de todo o grupo
+# `monitorados` pelo NetBird; Grafana e Prometheus escutam só no IP da VPN.
+
+- name: "[monitoring] Conferir senha do Grafana"
+  assert:
+    that: grafana_admin_password | default('') | length > 0
+    fail_msg: "Preencha grafana_admin_password no hosts.ini do monitoramento"
+  tags: [monitoring]
+
+- name: "[monitoring] IP do NetBird"
+  include_tasks: "{{ apps_dir }}/monitoring/ansible/vpn_ip.yml"
+  tags: [monitoring]
+
+# Funciona com --limit monitoramento: lê a wt0 de cada servidor por SSH.
+- name: "[monitoring] Ler interface wt0 dos servidores monitorados"
+  setup:
+    filter: ansible_wt0
+  delegate_to: "{{ item }}"
+  delegate_facts: true
+  loop: "{{ groups['monitorados'] }}"
+  when: hostvars[item].vpn_ip is not defined
+  tags: [monitoring]
+
+- name: "[monitoring] Montar lista de IPs do NetBird"
+  set_fact:
+    monitored_vpn_ips: "{{ monitored_vpn_ips | default({}) | combine({item: hostvars[item].vpn_ip | default(hostvars[item].ansible_wt0.ipv4.address | default(''))}) }}"
+  loop: "{{ groups['monitorados'] }}"
+  tags: [monitoring]
+
+- name: "[monitoring] Conferir IPs do NetBird"
+  assert:
+    that: monitored_vpn_ips | dict2items | selectattr('value', 'equalto', '') | list | length == 0
+    fail_msg: "Sem IP do NetBird em: {{ monitored_vpn_ips | dict2items | selectattr('value', 'equalto', '') | map(attribute='key') | join(', ') }}. Rode netbird-client nesses servidores ou preencha vpn_ip no hosts.ini"
+  tags: [monitoring]
+
+- name: "[monitoring] Criar diretórios de deploy"
+  file:
+    path: "{{ monitoring_path }}/{{ item }}"
+    state: directory
+    mode: '0755'
+  loop: ["", config, dashboards]
+  tags: [monitoring]
+
+- name: "[monitoring] Gerar prometheus.yml com os servidores monitorados"
+  template:
+    src: "{{ apps_dir }}/monitoring/config/prometheus.yml.j2"
+    dest: "{{ monitoring_path }}/config/prometheus.yml"
+    mode: '0644'
+  register: prometheus_config
+  tags: [monitoring]
+
+- name: "[monitoring] Copiar provisionamento do Grafana"
+  copy:
+    src: "{{ apps_dir }}/monitoring/config/grafana"
+    dest: "{{ monitoring_path }}/config/"
+    mode: '0644'
+    directory_mode: '0755'
+  register: grafana_provisioning
+  tags: [monitoring]
+
+- name: "[monitoring] Copiar dashboards"
+  copy:
+    src: "{{ apps_dir }}/monitoring/dashboards/"
+    dest: "{{ monitoring_path }}/dashboards/"
+    mode: '0644'
+  tags: [monitoring]
+
+- name: "[monitoring] Copiar docker-compose"
+  copy:
+    src: "{{ apps_dir }}/monitoring/compose.yml"
+    dest: "{{ monitoring_path }}/docker-compose.yml"
+    mode: '0644'
+  tags: [monitoring]
+
+# A senha só vale na primeira subida; depois, troque pelo Grafana.
+- name: "[monitoring] Criar .env"
+  copy:
+    dest: "{{ monitoring_path }}/.env"
+    content: |
+      VPN_IP={{ vpn_ip }}
+      GRAFANA_ADMIN_USER={{ grafana_admin_user | default('admin') }}
+      GRAFANA_ADMIN_PASSWORD={{ grafana_admin_password }}
+    mode: '0600'
+  no_log: true
+  tags: [monitoring]
+
+- name: "[monitoring] Subir Prometheus e Grafana"
+  command: docker compose up -d --remove-orphans
+  args:
+    chdir: "{{ monitoring_path }}"
+  tags: [monitoring]
+
+- name: "[monitoring] Recarregar prometheus.yml"
+  command: docker kill -s HUP prometheus
+  when: prometheus_config.changed
+  tags: [monitoring]
+
+- name: "[monitoring] Reiniciar Grafana para ler o provisionamento"
+  command: docker restart grafana
+  when: grafana_provisioning.changed
+  tags: [monitoring]
+
+- name: "[monitoring] Conferir alvos no Prometheus"
+  uri:
+    url: "http://{{ vpn_ip }}:9090/api/v1/targets?state=active"
+    return_content: yes
+  register: prometheus_targets
+  retries: 10
+  delay: 3
+  until: prometheus_targets.status == 200
+  tags: [monitoring]
+
+- name: "[monitoring] Alvos fora do ar (podem levar 15s para subir)"
+  debug:
+    msg: "{{ prometheus_targets.json.data.activeTargets | rejectattr('health', 'equalto', 'up') | map(attribute='scrapeUrl') | list }}"
+  tags: [monitoring]

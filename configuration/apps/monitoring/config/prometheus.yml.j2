@@ -1,0 +1,32 @@
+# Gerado pelo Ansible (etapa monitoring) a partir do grupo `monitorados`
+# (configuration/servers/groups.yml). Não edite no servidor.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["{{ vpn_ip }}:9090"]
+        labels:
+          instance: "{{ server }}"
+          server: "{{ server }}"
+
+  - job_name: "node-exporter"
+    static_configs:
+{% for h in groups['monitorados'] %}
+      - targets: ["{{ monitored_vpn_ips[h] }}:9100"]
+        labels:
+          instance: "{{ hostvars[h].server }}"
+          server: "{{ hostvars[h].server }}"
+{% endfor %}
+
+  - job_name: "cadvisor"
+    static_configs:
+{% for h in groups['monitorados'] %}
+      - targets: ["{{ monitored_vpn_ips[h] }}:9101"]
+        labels:
+          instance: "{{ hostvars[h].server }}"
+          server: "{{ hostvars[h].server }}"
+{% endfor %}

@@ -1,0 +1,11 @@
+---
+- name: "[exporters] Parar e remover node-exporter e cAdvisor"
+  command: docker rm -f node-exporter cadvisor
+  failed_when: false
+  tags: [exporters]
+
+- name: "[exporters] Remover diretório de deploy"
+  file:
+    path: "{{ exporters_path }}"
+    state: absent
+  tags: [exporters]
