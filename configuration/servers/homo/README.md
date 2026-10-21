@@ -11,6 +11,7 @@ Homologação. O Coolify daqui atende `*.homo.<domain>` e tem os certificados do
 | Traefik (coolify-proxy) | Docker | `:443` (recebe do prod pela VPN) | `coolify` |
 | NetBird Client | systemd (`netbird.service`) | `wt0` | `netbird-client` |
 | Supabase (self-hosted) | Docker (`/opt/supabase`) | `http://<ip>:8001` (API, Studio e S3), `:5432` | `supabase`, ver [apps/supabase](../../apps/supabase/README.md) |
+| S3 público do Supabase | Dynamic Configuration `supabase-s3.yaml` do proxy | `https://s3.homo.<domain>/storage/v1/s3` | painel, ver [apps/supabase](../../apps/supabase/README.md#endpoint-s3-público-links-assinados) |
 | node-exporter + cAdvisor | Docker (`/opt/exporters`) | `<IP NetBird>:9100`, `:9101` | `exporters`, ver [apps/monitoring](../../apps/monitoring/README.md) |
 
 Apps no Coolify daqui usam domínio com **`https://`** (`https://app.homo.<domain>`), como sempre. O proxy
