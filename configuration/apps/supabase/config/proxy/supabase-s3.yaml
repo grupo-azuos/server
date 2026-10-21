@@ -1,0 +1,32 @@
+# =============================================================================
+#  API S3 do Storage do homo, com domínio público.
+#
+#  Vai no Coolify do homo: Servers → localhost → Proxy → Dynamic Configurations,
+#  arquivo `supabase-s3.yaml` (colar este conteúdo). Não precisa de restart do proxy.
+#
+#  Por que existe: os apps entregam ao navegador LINKS ASSINADOS do storage (envio e
+#  download direto, sem o arquivo passar pela API). Com o endpoint na LAN
+#  (192.168.10.60:8001), o link não abre para quem está fora da rede interna.
+#
+#  Só o caminho /storage/v1/s3 é publicado: Studio, Auth, REST e o resto do Kong
+#  continuam só na LAN. Toda chamada S3 exige assinatura SigV4; o bucket segue privado.
+#
+#  O Kong roda fora do Coolify (/opt/supabase), por isso o destino é o IP do homo,
+#  e não um container na rede `coolify`.
+# =============================================================================
+http:
+  routers:
+    supabase-s3:
+      rule: Host(`s3.homo.grupoazuos.com.br`) && PathPrefix(`/storage/v1/s3`)
+      entryPoints:
+        - https
+      service: supabase-s3
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    supabase-s3:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: http://192.168.10.60:8001

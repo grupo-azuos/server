@@ -32,6 +32,57 @@ AWS_ACCESS_KEY_ID=<id> AWS_SECRET_ACCESS_KEY=<secret> \
 aws s3 ls --endpoint-url http://192.168.10.60:8001/storage/v1/s3 --region local
 ```
 
+### Endpoint S3 público (links assinados)
+
+Os apps entregam ao navegador **links assinados** do storage: o arquivo vai e volta direto entre navegador e
+storage, sem passar pela API. Com o endpoint da LAN, o link não abre para quem está fora da rede interna (casa,
+filial, 4G). Por isso o caminho S3 também é publicado num domínio:
+
+| | |
+|---|---|
+| Endpoint público | `https://s3.homo.grupoazuos.com.br/storage/v1/s3` |
+| Rota | Traefik do homo → `http://192.168.10.60:8001` (Kong) |
+| Arquivo | [`config/proxy/supabase-s3.yaml`](config/proxy/supabase-s3.yaml) |
+| Onde fica no servidor | Coolify do homo → Servers → localhost → Proxy → **Dynamic Configurations** → `supabase-s3.yaml` |
+
+Só `/storage/v1/s3` é publicado; Studio, Auth e REST continuam só na LAN. Toda chamada exige assinatura SigV4 e os
+buckets seguem privados.
+
+```text
+navegador ─▶ https://s3.homo.grupoazuos.com.br/storage/v1/s3/<bucket>/<chave>?X-Amz-Signature=...
+          ─▶ prod (passthrough por SNI) ─▶ túnel ─▶ Traefik do homo ─▶ Kong :8001 ─▶ storage
+```
+
+**Aplicar:** em Dynamic Configurations, **+ Add**, nome `supabase-s3.yaml`, colar o conteúdo do arquivo e **Save**.
+O Traefik carrega sozinho, sem restart. O certificado é emitido no primeiro acesso.
+
+**Nos apps:** dois endereços, porque o servidor continua falando com o storage pela LAN:
+
+```env
+S3_ENDPOINT=http://192.168.10.60:8001/storage/v1/s3          # servidor: conferir, mover, ler, apagar
+S3_PUBLIC_ENDPOINT=https://s3.homo.grupoazuos.com.br/storage/v1/s3   # vai dentro do link do navegador
+S3_BUCKET=<bucket do app>                                    # um por app, nunca o de outro
+```
+
+**Envio direto do navegador (PUT):** o domínio do S3 é outra origem, então passa pelo plugin global de CORS do Kong
+(`KONG_CORS_ORIGIN`). Com `*` já funciona; se for restringido, cada app do homo entra na lista.
+
+**Assinatura:** o storage confere a SigV4 com o host que ele remonta a partir dos `X-Forwarded-*` do Kong. Atrás do
+Traefik, o Kong não confia nesses cabeçalhos (sem `KONG_TRUSTED_IPS`), então repassa o próprio `Host`
+(`s3.homo.grupoazuos.com.br`) com a porta publicada dele (`8001`, pelo `KONG_PORT_MAPS`). **Pendente de teste:**
+se o link assinado para o domínio público voltar `SignatureDoesNotMatch`, o app assina com
+`S3_SIGNING_HOST=s3.homo.grupoazuos.com.br:8001` (o paralegal já tem esse ajuste), ou o Kong passa a confiar no
+Traefik com `KONG_TRUSTED_IPS`.
+
+**Conferir:**
+
+```bash
+curl -sI https://s3.homo.grupoazuos.com.br/storage/v1/s3/   # resposta do storage (403/400 em XML), certificado válido
+curl -sI https://s3.homo.grupoazuos.com.br/                 # 503 (catchall do Coolify): só o caminho S3 é publicado
+```
+
+Depois, no app: um envio e um download de verdade, de fora da rede interna.
+
 ### Atualizar o Supabase do homo (Ansible deste repo)
 
 Arquivos: `compose.yml` (vira `/opt/supabase/docker-compose.yml`), `supabase.env.j2` (vira `/opt/supabase/.env`),
