@@ -62,6 +62,11 @@ Em **Dashboards → New → Import**, importe os IDs da comunidade:
 Os alvos usam `instance=<nome do servidor>` (`homo`, `crm`...) em vez de `IP:porta`, então os seletores
 mostram o nome. Para versionar um dashboard, exporte o JSON e salve em `dashboards/`.
 
+## Métricas de dentro dos apps
+
+Esta stack vê máquina e container. Para JVM, Node, Rust e afins (heap, GC, event loop, latência por rota),
+o app precisa expor `/metrics`. O plano está em [METRICAS-APPS.md](METRICAS-APPS.md).
+
 ## Remover
 
 ```bash
