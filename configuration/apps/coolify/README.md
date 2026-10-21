@@ -36,6 +36,8 @@ clique em **Save** e depois em **Restart Proxy**. O restart derruba por alguns s
 Se alguém usar **Reset Configuration** no proxy, esses ajustes se perdem e precisam ser refeitos.
 No prod, a rota `*.homo` fica em **Dynamic Configurations → homo.yaml** e é gerada pelo Ansible
 (`ansible/deploy.tunnel-prod.yml`, a partir de `config/homo.yaml.j2`).
+No homo, **Dynamic Configurations → supabase-s3.yaml** publica o S3 do Supabase em `s3.homo.grupoazuos.com.br`; a fonte
+é [`apps/supabase/config/proxy/supabase-s3.yaml`](../supabase/config/proxy/supabase-s3.yaml).
 
 ## Labels: cada app com as suas
 
