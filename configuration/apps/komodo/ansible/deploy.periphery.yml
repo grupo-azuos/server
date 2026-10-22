@@ -1,0 +1,83 @@
+---
+# =========================================================================
+# === KOMODO PERIPHERY (AGENTE) ===
+# =========================================================================
+# Em todo servidor do grupo komodo. Conecta no Core pela VPN e entra no painel
+# com o nome do `server=` do hosts.ini.
+
+- name: "[komodo-periphery] Conferir servidor do Core"
+  assert:
+    that: groups['komodo_core'] | default([]) | length == 1
+    fail_msg: "O grupo komodo_core (configuration/servers/groups.yml) precisa ter exatamente um servidor"
+  tags: [komodo-periphery]
+
+# Funciona com --limit <servidor>: lê a wt0 do Core por SSH.
+- name: "[komodo-periphery] Ler interface wt0 do Core"
+  setup:
+    filter: ansible_wt0
+  delegate_to: "{{ groups['komodo_core'][0] }}"
+  delegate_facts: true
+  run_once: true
+  when: komodo_core_address is not defined and hostvars[groups['komodo_core'][0]].vpn_ip is not defined
+  tags: [komodo-periphery]
+
+- name: "[komodo-periphery] Endereço do Core"
+  set_fact:
+    komodo_core_address: "{{ komodo_core_address | default('ws://' ~ (hostvars[groups['komodo_core'][0]].vpn_ip | default(hostvars[groups['komodo_core'][0]].ansible_wt0.ipv4.address | default(''))) ~ ':9120') }}"
+  tags: [komodo-periphery]
+
+- name: "[komodo-periphery] Conferir endereço do Core"
+  assert:
+    that: komodo_core_address is not search('ws://:')
+    fail_msg: "Sem IP do NetBird no Core ({{ groups['komodo_core'][0] }}). Rode netbird-client nele ou preencha vpn_ip / komodo_core_address no hosts.ini"
+  tags: [komodo-periphery]
+
+- name: "[komodo-periphery] Criar diretórios"
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ komodo_periphery_path }}"
+    - /etc/komodo
+  tags: [komodo-periphery]
+
+- name: "[komodo-periphery] Copiar docker-compose"
+  copy:
+    src: "{{ apps_dir }}/komodo/compose.periphery.yml"
+    dest: "{{ komodo_periphery_path }}/docker-compose.yml"
+    mode: '0644'
+  tags: [komodo-periphery]
+
+- name: "[komodo-periphery] Criar .env (versão)"
+  copy:
+    dest: "{{ komodo_periphery_path }}/.env"
+    content: |
+      KOMODO_VERSION={{ komodo_version }}
+    mode: '0644'
+  tags: [komodo-periphery]
+
+- name: "[komodo-periphery] Criar periphery.env (Core, nome e onboarding key)"
+  template:
+    src: "{{ apps_dir }}/komodo/config/periphery.env.j2"
+    dest: "{{ komodo_periphery_path }}/periphery.env"
+    mode: '0600'
+  no_log: true
+  tags: [komodo-periphery]
+
+- name: "[komodo-periphery] Subir agente"
+  command: docker compose up -d --remove-orphans
+  args:
+    chdir: "{{ komodo_periphery_path }}"
+  tags: [komodo-periphery]
+
+- name: "[komodo-periphery] Conferir agente rodando"
+  command: docker compose ps --status running -q periphery
+  args:
+    chdir: "{{ komodo_periphery_path }}"
+  register: periphery_running
+  changed_when: false
+  retries: 10
+  delay: 3
+  until: periphery_running.stdout | length > 0
+  tags: [komodo-periphery]

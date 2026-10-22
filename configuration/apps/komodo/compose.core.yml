@@ -1,0 +1,50 @@
+# Komodo Core (painel + API) e o banco dele, só no servidor do grupo komodo_core (/opt/komodo).
+# Base: compose/mongo.compose.yaml oficial (v2), sem o Periphery: o agente deste
+# servidor sobe como em todos os outros (compose.periphery.yml).
+# O painel escuta só no IP do NetBird (VPN_IP).
+services:
+  mongo:
+    image: mongo:${MONGO_VERSION:?}
+    container_name: komodo-mongo
+    labels:
+      komodo.skip: ""  # o "Stop All Containers" do Komodo não derruba o próprio banco
+    command: --quiet --wiredTigerCacheSizeGB 0.25
+    restart: unless-stopped
+    env_file: ./secrets.env
+    volumes:
+      - komodo-mongo-data:/data/db
+      - komodo-mongo-config:/data/configdb
+
+  core:
+    image: ghcr.io/moghtech/komodo-core:${KOMODO_VERSION:?}
+    container_name: komodo-core
+    init: true
+    restart: unless-stopped
+    labels:
+      komodo.skip: ""
+    depends_on:
+      - mongo
+    ports:
+      - "${VPN_IP:?}:9120:9120"
+    env_file: ./secrets.env
+    environment:
+      KOMODO_DATABASE_ADDRESS: mongo:27017
+      KOMODO_HOST: ${KOMODO_HOST:?}
+      KOMODO_TITLE: Komodo
+      KOMODO_LOCAL_AUTH: "true"
+      KOMODO_INIT_ADMIN_USERNAME: admin
+      KOMODO_DISABLE_USER_REGISTRATION: "true"
+      TZ: America/Sao_Paulo
+    volumes:
+      # Par de chaves do Core (Noise) usado com os agentes
+      - komodo-keys:/config/keys
+      # Backups datados do banco: https://komo.do/docs/setup/backup
+      - /etc/komodo/backups:/backups
+
+volumes:
+  komodo-mongo-data:
+    name: komodo-mongo-data
+  komodo-mongo-config:
+    name: komodo-mongo-config
+  komodo-keys:
+    name: komodo-keys

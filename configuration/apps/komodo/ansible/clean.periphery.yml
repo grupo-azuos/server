@@ -1,0 +1,14 @@
+---
+- name: "[komodo-periphery] Parar agente (com -e remove_volumes=true, apaga as chaves dele)"
+  command: "docker compose down {{ '-v' if (remove_volumes | default(false) | bool) else '' }}"
+  args:
+    chdir: "{{ komodo_periphery_path }}"
+    removes: "{{ komodo_periphery_path }}/docker-compose.yml"
+  tags: [komodo-periphery]
+
+# /etc/komodo fica: lá estão os stacks e repos que o Komodo publicou neste servidor.
+- name: "[komodo-periphery] Remover diretório de deploy"
+  file:
+    path: "{{ komodo_periphery_path }}"
+    state: absent
+  tags: [komodo-periphery]
