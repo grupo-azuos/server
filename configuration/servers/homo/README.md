@@ -13,6 +13,8 @@ Homologação. O Coolify daqui atende `*.homo.<domain>` e tem os certificados do
 | Supabase (self-hosted) | Docker (`/opt/supabase`) | `http://<ip>:8001` (API, Studio e S3), `:5432` | `supabase`, ver [apps/supabase](../../apps/supabase/README.md) |
 | S3 público do Supabase | Dynamic Configuration `supabase-s3.yaml` do proxy | `https://s3.homo.<domain>/storage/v1/s3` | painel, ver [apps/supabase](../../apps/supabase/README.md#endpoint-s3-público-links-assinados) |
 | node-exporter + cAdvisor | Docker (`/opt/exporters`) | `<IP NetBird>:9100`, `:9101` | `exporters`, ver [apps/monitoring](../../apps/monitoring/README.md) |
+| Komodo Periphery | Docker (`/opt/komodo-periphery`) | conecta no Core pela VPN | `komodo-periphery`, ver [apps/komodo](../../apps/komodo/README.md) |
+| Caddy | Docker (`/opt/caddy`) | local, `<IP NetBird>:8088`, atrás da borda | `caddy`, ver [apps/caddy](../../apps/caddy/README.md) |
 
 Apps no Coolify daqui usam domínio com **`https://`** (`https://app.homo.<domain>`), como sempre. O proxy
 daqui usa desafio ACME TLS-ALPN (o único que passa pelo passthrough do prod) e aceita PROXY protocol da VPN,
@@ -25,6 +27,10 @@ para os apps verem o IP real do cliente. Ajustes e labels: [apps/coolify](../../
 **Sem SSH:** este servidor é alterado só pelo painel do Coolify (`https://coolify.homo.<domain>`, ou
 `http://<IP do NetBird>:8000`).
 
+## Rotas do Caddy
+
+Em [`vars.yml`](vars.yml) (`caddy_routes`), versionado. Formato em [apps/caddy](../../apps/caddy/README.md#rotas).
+
 ## Inventário
 
 Copie [`inventory.ini`](inventory.ini) para `hosts.ini` (ignorado pelo git) e preencha.
@@ -34,11 +40,12 @@ Copie [`inventory.ini`](inventory.ini) para `hosts.ini` (ignorado pelo git) e pr
 | `domain` | Domínio base (mesmo do prod) |
 | `email` | Contato |
 | `netbird_setup_key` | Conecta o agente NetBird na VPN |
+| `komodo_onboarding_key` | Registra o agente no Komodo (criada no painel) |
 | `coolify_root_email`, `coolify_root_password` | Admin do Coolify na instalação |
 
 ## Deploy
 
 A instalação inicial (etapas `coolify` e `netbird-client`) usa
 `ansible-playbook configuration/ansible/deploy.yml --tags <etapa> --limit homo`. Depois disso, as mudanças são
-feitas pelo painel do Coolify. Exceções: os exporters (`--tags exporters --limit homo`) e o Supabase (`/opt/supabase`), atualizado por
+feitas pelo painel do Coolify. Exceções: os exporters, o agente do Komodo e o Caddy (`--tags exporters,komodo-periphery,caddy --limit homo`) e o Supabase (`/opt/supabase`), atualizado por
 `ansible-playbook configuration/ansible/deploy.yml --tags supabase --limit homo` (ver [apps/supabase](../../apps/supabase/README.md)).

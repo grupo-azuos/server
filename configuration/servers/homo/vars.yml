@@ -1,0 +1,14 @@
+# Variáveis não secretas do servidor homo, carregadas pelo deploy.yml.
+# Segredos ficam no hosts.ini.
+
+# Atrás da borda: só HTTP, na porta caddy_tunnel_port do IP do NetBird.
+caddy_mode: local
+
+# Nomes publicados pelo Caddy deste servidor. Cada rota tem `hosts` e um destino:
+#   upstream: <container>:<porta>   app na rede docker `caddy` deste servidor
+#   server: <nome>                  repassa pela VPN ao Caddy daquele servidor (modo local)
+#   path: /x/*                      (opcional) publica só esse caminho; o resto responde 404
+caddy_routes: []
+  # Mesmo nome da rota na borda (monitoramento), apontando para o app daqui
+  # - hosts: ["app.homo.{{ domain }}"]
+  #   upstream: app:3000

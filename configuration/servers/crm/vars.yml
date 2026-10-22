@@ -1,0 +1,12 @@
+# Variáveis não secretas do servidor crm, carregadas pelo deploy.yml.
+# Segredos ficam no hosts.ini.
+
+caddy_mode: edge
+
+# Nomes publicados pelo Caddy deste servidor. Cada rota tem `hosts` e um destino:
+#   upstream: <container>:<porta>   app na rede docker `caddy` deste servidor
+#   server: <nome>                  repassa pela VPN ao Caddy daquele servidor (modo local)
+#   path: /x/*                      (opcional) publica só esse caminho; o resto responde 404
+caddy_routes: []
+  # - hosts: ["crm.{{ domain }}"]
+  #   upstream: crm:3000

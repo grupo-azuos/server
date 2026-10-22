@@ -13,3 +13,8 @@ groups:
   # Servidores com node-exporter + cAdvisor, coletados pelo Prometheus do monitoramento.
   # Para monitorar o prod também, acrescente 'prod' na lista.
   monitorados: server in ['homo', 'automacao', 'crm', 'internos', 'monitoramento']
+  # Komodo: o painel (Core) roda num servidor só; o agente (Periphery), em todos do grupo komodo.
+  komodo_core: server == 'monitoramento'
+  komodo: server in ['homo', 'automacao', 'crm', 'internos', 'monitoramento']
+  # Caddy em todos; o modo (borda ou local) fica no vars.yml de cada um.
+  caddy: server in ['homo', 'automacao', 'crm', 'internos', 'monitoramento']
