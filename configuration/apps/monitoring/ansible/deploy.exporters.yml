@@ -5,7 +5,7 @@
 # Em todo servidor do grupo `monitorados`. Escutam só no IP do NetBird.
 
 - name: "[exporters] IP do NetBird"
-  include_tasks: "{{ apps_dir }}/monitoring/ansible/vpn_ip.yml"
+  include_tasks: "{{ playbook_dir }}/tasks/vpn_ip.yml"
   tags: [exporters]
 
 - name: "[exporters] Criar diretório de deploy"

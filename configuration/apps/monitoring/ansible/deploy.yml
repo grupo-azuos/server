@@ -12,7 +12,7 @@
   tags: [monitoring]
 
 - name: "[monitoring] IP do NetBird"
-  include_tasks: "{{ apps_dir }}/monitoring/ansible/vpn_ip.yml"
+  include_tasks: "{{ playbook_dir }}/tasks/vpn_ip.yml"
   tags: [monitoring]
 
 # Funciona com --limit monitoramento: lê a wt0 de cada servidor por SSH.
