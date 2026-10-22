@@ -23,10 +23,23 @@ O desafio do Let's Encrypt é o TLS-ALPN (porta 443), o único que atravessa o p
 | `automacao` | Automações: agente NetBird, exporters | [servers/automacao](configuration/servers/automacao/README.md) |
 | `crm` | CRM: agente NetBird, exporters | [servers/crm](configuration/servers/crm/README.md) |
 | `internos` | Sistemas internos: agente NetBird, exporters | [servers/internos](configuration/servers/internos/README.md) |
-| `monitoramento` | Prometheus + Grafana (só pela VPN), agente NetBird, exporters | [servers/monitoramento](configuration/servers/monitoramento/README.md) |
+| `monitoramento` | Painel do Komodo, Prometheus + Grafana (só pela VPN), agente NetBird, exporters | [servers/monitoramento](configuration/servers/monitoramento/README.md) |
 
 Todos entram no NetBird. Os exporters (node-exporter + cAdvisor) rodam em todos, menos no prod, e o
 Prometheus do `monitoramento` coleta os dados pela VPN: [apps/monitoring](configuration/apps/monitoring/README.md).
+O agente do Komodo também roda em todos, menos no prod, e o painel fica no `monitoramento`: [apps/komodo](configuration/apps/komodo/README.md).
+Cada um tem um Caddy (borda com TLS automático; no homo, atrás da borda pela VPN), com as rotas em
+`configuration/servers/<servidor>/vars.yml`: [apps/caddy](configuration/apps/caddy/README.md).
+
+**Os 5 de uma vez** (docker, netbird-client, exporters, monitoring, komodo, komodo-periphery e caddy, nessa ordem):
+
+```bash
+ansible-playbook configuration/ansible/deploy.yml --tags servidores
+```
+
+Na primeira vez a onboarding key ainda não existe (ela é criada no painel do Komodo), então os agentes sobem
+mas não entram no painel. Crie a chave em **Settings → Onboarding**, preencha `komodo_onboarding_key` nos
+`hosts.ini` e rode de novo: as etapas já feitas não mudam nada.
 
 ## Preparação (uma vez)
 
@@ -155,6 +168,19 @@ ansible-playbook configuration/ansible/deploy.yml --tags monitoring --limit moni
 
 A etapa `coolify` agora só roda no prod e no homo. Detalhes e dashboards: [apps/monitoring](configuration/apps/monitoring/README.md).
 Conferir: `http://<IP do monitoramento no NetBird>:9090/targets` com todos `UP`, e o Grafana em `:3000`.
+
+### 9. Komodo
+
+Painel no `monitoramento` (com `komodo_admin_password`), onboarding key criada nele, depois os agentes:
+
+```bash
+ansible-playbook configuration/ansible/deploy.yml --tags komodo --limit komodo_core
+# no painel: Settings → Onboarding → nova chave em komodo_onboarding_key nos hosts.ini
+ansible-playbook configuration/ansible/deploy.yml --tags komodo-periphery
+```
+
+Conferir: `http://<IP do monitoramento no NetBird>:9120`, com todos os servidores em **Servers**. Domínios vêm do Caddy
+de cada servidor; detalhes em [apps/komodo](configuration/apps/komodo/README.md).
 
 ## Cuidados
 
