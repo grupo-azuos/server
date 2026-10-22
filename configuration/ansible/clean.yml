@@ -9,6 +9,9 @@
     supabase_path: "/opt/supabase"
     monitoring_path: "/opt/monitoring"
     exporters_path: "/opt/exporters"
+    komodo_path: "/opt/komodo"
+    komodo_periphery_path: "/opt/komodo-periphery"
+    caddy_path: "/opt/caddy"
 
   tasks:
     # =========================================================================
@@ -54,3 +57,24 @@
       include_tasks: "{{ apps_dir }}/monitoring/ansible/clean.exporters.yml"
       when: inventory_hostname in groups['monitorados'] | default([])
       tags: [exporters]
+
+    # =========================================================================
+    # === KOMODO ===
+    # =========================================================================
+    - name: "[komodo-periphery] Teardown Komodo Periphery"
+      include_tasks: "{{ apps_dir }}/komodo/ansible/clean.periphery.yml"
+      when: inventory_hostname in groups['komodo'] | default([])
+      tags: [komodo-periphery]
+
+    - name: "[komodo] Teardown Komodo Core"
+      include_tasks: "{{ apps_dir }}/komodo/ansible/clean.core.yml"
+      when: inventory_hostname in groups['komodo_core'] | default([])
+      tags: [komodo]
+
+    # =========================================================================
+    # === CADDY ===
+    # =========================================================================
+    - name: "[caddy] Teardown Caddy"
+      include_tasks: "{{ apps_dir }}/caddy/ansible/clean.yml"
+      when: inventory_hostname in groups['caddy'] | default([])
+      tags: [caddy]

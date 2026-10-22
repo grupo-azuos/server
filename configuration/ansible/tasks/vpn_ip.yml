@@ -1,0 +1,13 @@
+---
+# IP deste servidor no NetBird: `vpn_ip=` do hosts.ini ou, sem ele, o da interface wt0.
+# Tag `always`: roda sempre que a etapa que inclui este arquivo roda.
+- name: "[vpn] Descobrir IP do NetBird deste servidor"
+  set_fact:
+    vpn_ip: "{{ vpn_ip | default(ansible_wt0.ipv4.address | default('')) }}"
+  tags: [always]
+
+- name: "[vpn] Conferir IP do NetBird"
+  assert:
+    that: vpn_ip | length > 0
+    fail_msg: "Sem IP do NetBird (wt0) em {{ inventory_hostname }}. Rode a etapa netbird-client antes, ou preencha vpn_ip no hosts.ini"
+  tags: [always]
