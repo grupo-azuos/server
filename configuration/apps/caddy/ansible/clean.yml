@@ -1,0 +1,13 @@
+---
+- name: "[caddy] Parar Caddy (com -e remove_volumes=true, apaga os certificados)"
+  command: "docker compose down {{ '-v' if (remove_volumes | default(false) | bool) else '' }}"
+  args:
+    chdir: "{{ caddy_path }}"
+    removes: "{{ caddy_path }}/docker-compose.yml"
+  tags: [caddy]
+
+- name: "[caddy] Remover diretório de deploy"
+  file:
+    path: "{{ caddy_path }}"
+    state: absent
+  tags: [caddy]

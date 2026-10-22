@@ -1,0 +1,27 @@
+# Caddy de cada servidor (/opt/caddy). As portas vêm do override do modo:
+# compose.edge.yml (borda, TLS) ou compose.local.yml (atrás da borda, só VPN).
+networks:
+  caddy:
+    external: true
+
+services:
+  caddy:
+    image: caddy:${CADDY_VERSION:?}
+    container_name: caddy
+    restart: unless-stopped
+    environment:
+      - EMAIL=${EMAIL}
+      - VPN_CIDR=${VPN_CIDR}
+    volumes:
+      # Diretório inteiro, não o arquivo: o Ansible troca os arquivos e o container vê na hora
+      - ./config:/etc/caddy:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - caddy
+
+volumes:
+  caddy-data:
+    name: caddy-data
+  caddy-config:
+    name: caddy-config

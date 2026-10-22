@@ -1,0 +1,9 @@
+# Atrás da borda: sem TLS, e confia no X-Forwarded-For só vindo da VPN.
+{
+	auto_https off
+	servers {
+		trusted_proxies static {$VPN_CIDR}
+	}
+}
+
+import /etc/caddy/conf.d/*.caddy

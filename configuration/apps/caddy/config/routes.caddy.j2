@@ -1,0 +1,17 @@
+# Gerado pelo Ansible a partir de caddy_routes (configuration/servers/{{ server }}/vars.yml).
+{% for r in caddy_routes %}
+{% set up = r.upstream if r.upstream is defined else (caddy_route_ips[r.server] ~ ':' ~ caddy_tunnel_port) %}
+
+{{ r.hosts | map('regex_replace', '^', 'http://' if caddy_mode == 'local' else '') | join(', ') }} {
+{% if r.path is defined %}
+	handle {{ r.path }} {
+		reverse_proxy {{ up }}
+	}
+	handle {
+		respond 404
+	}
+{% else %}
+	reverse_proxy {{ up }}
+{% endif %}
+}
+{% endfor %}

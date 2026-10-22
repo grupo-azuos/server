@@ -1,0 +1,5 @@
+# Atrás da borda: só HTTP, só no IP do NetBird. A borda termina o TLS e repassa por aqui.
+services:
+  caddy:
+    ports:
+      - "${VPN_IP:?}:${CADDY_TUNNEL_PORT:?}:80"

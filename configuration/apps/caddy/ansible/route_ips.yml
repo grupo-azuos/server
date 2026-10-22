@@ -1,0 +1,28 @@
+---
+# IP do NetBird de cada servidor citado em `server:` nas caddy_routes (lido por SSH).
+- name: "[caddy] Servidores de destino das rotas"
+  set_fact:
+    caddy_route_servers: "{{ caddy_routes | selectattr('server', 'defined') | map(attribute='server') | unique | list }}"
+    caddy_route_ips: {}
+  tags: [caddy]
+
+- name: "[caddy] Ler interface wt0 dos servidores de destino"
+  setup:
+    filter: ansible_wt0
+  delegate_to: "{{ groups[item][0] }}"
+  delegate_facts: true
+  loop: "{{ caddy_route_servers }}"
+  when: hostvars[groups[item][0]].vpn_ip is not defined
+  tags: [caddy]
+
+- name: "[caddy] Montar IPs do NetBird dos destinos"
+  set_fact:
+    caddy_route_ips: "{{ caddy_route_ips | default({}) | combine({item: hostvars[groups[item][0]].vpn_ip | default(hostvars[groups[item][0]].ansible_wt0.ipv4.address | default(''))}) }}"
+  loop: "{{ caddy_route_servers }}"
+  tags: [caddy]
+
+- name: "[caddy] Conferir IPs dos destinos"
+  assert:
+    that: caddy_route_ips | dict2items | selectattr('value', 'equalto', '') | list | length == 0
+    fail_msg: "Sem IP do NetBird em: {{ caddy_route_ips | dict2items | selectattr('value', 'equalto', '') | map(attribute='key') | join(', ') }}"
+  tags: [caddy]

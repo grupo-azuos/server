@@ -1,0 +1,100 @@
+---
+# =========================================================================
+# === CADDY ===
+# =========================================================================
+# caddy_mode (servers/<servidor>/vars.yml): edge = borda com TLS; local = atrás
+# da borda, só HTTP no IP do NetBird. As rotas vêm de caddy_routes.
+
+- name: "[caddy] IP do NetBird"
+  include_tasks: "{{ playbook_dir }}/tasks/vpn_ip.yml"
+  tags: [caddy]
+
+- name: "[caddy] Conferir modo"
+  assert:
+    that: caddy_mode in ['edge', 'local']
+    fail_msg: "caddy_mode deve ser edge ou local (servers/{{ server }}/vars.yml)"
+  tags: [caddy]
+
+- name: "[caddy] IPs dos destinos pela VPN"
+  include_tasks: "{{ apps_dir }}/caddy/ansible/route_ips.yml"
+  tags: [caddy]
+
+- name: "[caddy] Conferir rede caddy"
+  command: docker network inspect caddy
+  register: caddy_network
+  changed_when: false
+  failed_when: false
+  tags: [caddy]
+
+- name: "[caddy] Criar rede caddy (os apps entram nela para serem publicados)"
+  command: docker network create caddy
+  when: caddy_network.rc != 0
+  tags: [caddy]
+
+- name: "[caddy] Criar diretórios"
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ caddy_path }}"
+    - "{{ caddy_path }}/config"
+    - "{{ caddy_path }}/config/conf.d"
+  tags: [caddy]
+
+- name: "[caddy] Copiar docker-compose e o override do modo"
+  copy:
+    src: "{{ apps_dir }}/caddy/{{ item.src }}"
+    dest: "{{ caddy_path }}/{{ item.dest }}"
+    mode: '0644'
+  loop:
+    - { src: compose.yml, dest: docker-compose.yml }
+    - { src: "compose.{{ caddy_mode }}.yml", dest: docker-compose.override.yml }
+  tags: [caddy]
+
+- name: "[caddy] Criar .env"
+  copy:
+    dest: "{{ caddy_path }}/.env"
+    content: |
+      CADDY_VERSION={{ caddy_version }}
+      EMAIL={{ email }}
+      VPN_CIDR={{ vpn_cidr }}
+      VPN_IP={{ vpn_ip }}
+      CADDY_TUNNEL_PORT={{ caddy_tunnel_port }}
+    mode: '0644'
+  tags: [caddy]
+
+- name: "[caddy] Copiar Caddyfile do modo"
+  copy:
+    src: "{{ apps_dir }}/caddy/config/Caddyfile.{{ caddy_mode }}"
+    dest: "{{ caddy_path }}/config/Caddyfile"
+    mode: '0644'
+  register: caddy_main
+  tags: [caddy]
+
+- name: "[caddy] Gerar rotas"
+  template:
+    src: "{{ apps_dir }}/caddy/config/routes.caddy.j2"
+    dest: "{{ caddy_path }}/config/conf.d/routes.caddy"
+    mode: '0644'
+  register: caddy_routes_file
+  tags: [caddy]
+
+- name: "[caddy] Validar configuração"
+  command: >
+    docker run --rm --env-file {{ caddy_path }}/.env
+    -v {{ caddy_path }}/config:/etc/caddy:ro
+    caddy:{{ caddy_version }} caddy validate --config /etc/caddy/Caddyfile
+  changed_when: false
+  tags: [caddy]
+
+- name: "[caddy] Subir Caddy"
+  command: docker compose up -d --remove-orphans
+  args:
+    chdir: "{{ caddy_path }}"
+  tags: [caddy]
+
+- name: "[caddy] Recarregar configuração"
+  command: docker exec caddy caddy reload --config /etc/caddy/Caddyfile
+  when: caddy_main.changed or caddy_routes_file.changed
+  tags: [caddy]
