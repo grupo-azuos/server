@@ -41,6 +41,13 @@ Na primeira vez a onboarding key ainda não existe (ela é criada no painel do K
 mas não entram no painel. Crie a chave em **Settings → Onboarding**, preencha `komodo_onboarding_key` nos
 `hosts.ini` e rode de novo: as etapas já feitas não mudam nada.
 
+## Versões da infra
+
+| Versão | O que é |
+|---|---|
+| [v1.0.0](versions/v1.0.0.md) | Como está hoje: Hostinger, Supabase, Vercel, Firebase |
+| [v1.0.1](versions/v1.0.1.md) | DigitalOcean (2 VPS + Postgres gerenciado com standby) e Cloudflare só DNS |
+
 ## Preparação (uma vez)
 
 ```bash
