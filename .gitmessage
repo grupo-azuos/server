@@ -31,6 +31,7 @@
 #   komodo     configuration/apps/komodo/
 #   caddy      configuration/apps/caddy/
 #   docs       .md na raiz
+#   versions   versions/ (versões da infra)
 #   ci         .github/
 #   git        .gitmessage, .githooks/, .gitattributes, .gitignore
 #   claude     .claude/ e CLAUDE.md
