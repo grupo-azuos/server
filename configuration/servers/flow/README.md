@@ -20,7 +20,7 @@ Em [`vars.yml`](vars.yml) (`caddy_routes`), versionado. Formato em [apps/caddy](
 
 ## Inventário
 
-Copie [`inventory.ini`](inventory.ini) para `hosts.ini` (ignorado pelo git) e preencha.
+Modelo do `hosts.ini` em [HOSTS_FORMATS.md](../HOSTS_FORMATS.md#flow).
 
 | Variável | Para quê |
 |---|---|

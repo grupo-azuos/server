@@ -98,7 +98,7 @@ caminhos, faixa da VPN) ficam no `vars:` de `configuration/ansible/deploy.yml`.
 | `configuration/ansible/` | `deploy.yml` e `clean.yml`: chamam as tasks dos apps por tag |
 | `configuration/apps/<app>/` | `compose.yml`, `config/` e `ansible/deploy.*.yml` / `clean.*.yml` de cada app |
 | `configuration/apps/coolify/README.md` | Proxy do Traefik, modelo de labels, diagnóstico e histórico de correções |
-| `configuration/servers/<servidor>/` | `hosts.ini` (real, fora do git), `inventory.ini` (modelo) e README |
+| `configuration/servers/<servidor>/` | `hosts.ini` (real, fora do git), `vars.yml` e README. Modelos do `hosts.ini` em `HOSTS_FORMATS.md` |
 
 Todos os comandos rodam da raiz do repo; o `ansible.cfg` já carrega todos os inventários (um `hosts.ini` que ainda não existe só gera aviso).
 
