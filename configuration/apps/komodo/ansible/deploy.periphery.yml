@@ -20,7 +20,7 @@
   run_once: true
   when: komodo_core_address is not defined and hostvars[groups['komodo_core'][0]].vpn_ip is not defined
   tags: [komodo-periphery]
-
+  
 - name: "[komodo-periphery] Endereço do Core"
   set_fact:
     komodo_core_address: "{{ komodo_core_address | default('ws://' ~ (hostvars[groups['komodo_core'][0]].vpn_ip | default(hostvars[groups['komodo_core'][0]].ansible_wt0.ipv4.address | default(''))) ~ ':9120') }}"

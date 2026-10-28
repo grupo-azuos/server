@@ -23,6 +23,47 @@
   when: ansible_os_family == 'RedHat'
   tags: [docker]
 
+# O kernel do Rocky não traz xt_addrtype, que o Docker usa nas regras de NAT
+- name: "[docker] Instalar módulos extras do kernel (Rocky e família RedHat)"
+  dnf:
+    name: kernel-modules-extra
+    state: present
+  when: ansible_os_family == 'RedHat'
+  tags: [docker]
+
+- name: "[docker] Carregar módulos de rede no boot (Rocky e família RedHat)"
+  copy:
+    dest: /etc/modules-load.d/docker.conf
+    content: |
+      xt_addrtype
+      br_netfilter
+      ip_tables
+    mode: '0644'
+  when: ansible_os_family == 'RedHat'
+  tags: [docker]
+
+- name: "[docker] Carregar módulos de rede agora (Rocky e família RedHat)"
+  command: modprobe -a xt_addrtype br_netfilter ip_tables
+  register: docker_modprobe
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == 'RedHat'
+  tags: [docker]
+
+# Sem o módulo, o kernel em uso é mais velho que o kernel-modules-extra (upgrade sem reboot):
+# reinicia no kernel novo e carrega de novo
+- name: "[docker] Reiniciar no kernel novo (Rocky e família RedHat)"
+  reboot:
+    reboot_timeout: 600
+  when: ansible_os_family == 'RedHat' and docker_modprobe.rc | default(0) != 0
+  tags: [docker]
+
+- name: "[docker] Carregar módulos de rede depois do reboot (Rocky e família RedHat)"
+  command: modprobe -a xt_addrtype br_netfilter ip_tables
+  changed_when: false
+  when: ansible_os_family == 'RedHat' and docker_modprobe.rc | default(0) != 0
+  tags: [docker]
+
 - name: "[docker] Instalar Docker pelo script oficial (Debian/Ubuntu, se não instalado)"
   shell: curl -fsSL https://get.docker.com | sh
   args:
