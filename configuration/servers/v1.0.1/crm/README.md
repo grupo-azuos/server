@@ -8,19 +8,19 @@ Só o CRM.
 |---|---|---|---|
 | Docker | systemd | | `docker` |
 | NetBird Client | systemd (`netbird.service`) | `wt0` | `netbird-client` |
-| node-exporter + cAdvisor | Docker (`/opt/exporters`) | `<IP NetBird>:9100`, `:9101` | `exporters`, ver [apps/monitoring](../../apps/monitoring/README.md) |
-| Komodo Periphery | Docker (`/opt/komodo-periphery`) | conecta no Core pela VPN | `komodo-periphery`, ver [apps/komodo](../../apps/komodo/README.md) |
-| Caddy | Docker (`/opt/caddy`) | borda, TLS automático, `:80`/`:443` | `caddy`, ver [apps/caddy](../../apps/caddy/README.md) |
+| node-exporter + cAdvisor | Docker (`/opt/exporters`) | `<IP NetBird>:9100`, `:9101` | `exporters`, ver [apps/monitoring](../../../apps/monitoring/README.md) |
+| Komodo Periphery | Docker (`/opt/komodo-periphery`) | conecta no Core pela VPN | `komodo-periphery`, ver [apps/komodo](../../../apps/komodo/README.md) |
+| Caddy | Docker (`/opt/caddy`) | borda, TLS automático, `:80`/`:443` | `caddy`, ver [apps/caddy](../../../apps/caddy/README.md) |
 
 Ainda sem Coolify: por enquanto só entra na VPN e é monitorado.
 
 ## Rotas do Caddy
 
-Em [`vars.yml`](vars.yml) (`caddy_routes`), versionado. Formato em [apps/caddy](../../apps/caddy/README.md#rotas).
+Em [`vars.yml`](vars.yml) (`caddy_routes`), versionado. Formato em [apps/caddy](../../../apps/caddy/README.md#rotas).
 
 ## Inventário
 
-Modelo do `hosts.ini` em [HOSTS_FORMATS.md](../HOSTS_FORMATS.md#crm).
+Copie [`hosts.ini.example`](hosts.ini.example) para `hosts.ini` (ignorado pelo git) e preencha. É o mesmo conteúdo das secrets do GitHub Actions.
 
 | Variável | Para quê |
 |---|---|

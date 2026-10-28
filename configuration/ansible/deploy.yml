@@ -1,7 +1,7 @@
 ---
 # Rode da raiz do repo, uma etapa por vez (ver README):
 #   ansible-playbook configuration/ansible/deploy.yml --tags <etapa>
-# Só um servidor: acrescente --limit <servidor> (prod, homo, flow, crm, core, ops).
+# Só um servidor: acrescente --limit <servidor> (prod, homo, auto, crm, core, ops).
 # Os 5 servidores de uma vez (docker, netbird-client, exporters, monitoring, komodo, caddy):
 #   ansible-playbook configuration/ansible/deploy.yml --tags servidores
 - name: Deploy Server Infrastructure
@@ -37,10 +37,12 @@
     homo_vpn_ip: ""
 
   pre_tasks:
-    - name: "Variáveis do servidor (configuration/servers/<servidor>/vars.yml)"
+    - name: "Variáveis do servidor (configuration/servers/<versão>/<servidor>/vars.yml)"
       include_vars: "{{ item }}"
       with_first_found:
-        - files: ["{{ playbook_dir }}/../servers/{{ server }}/vars.yml"]
+        - files:
+            - "{{ playbook_dir }}/../servers/v1.0.1/{{ server }}/vars.yml"
+            - "{{ playbook_dir }}/../servers/v1.0.0/{{ server }}/vars.yml"
           skip: true
       tags: [always]
 
@@ -121,7 +123,7 @@
       tags: [komodo-periphery, servidores]
 
     # -------------------------------------------------------------------------
-    # Caddy: borda com TLS ou local atrás da borda (servers/<servidor>/vars.yml)
+    # Caddy: borda com TLS ou local atrás da borda (servers/<versão>/<servidor>/vars.yml)
     # -------------------------------------------------------------------------
     - name: "[caddy] Deploy Caddy"
       include_tasks: "{{ apps_dir }}/caddy/ansible/deploy.yml"

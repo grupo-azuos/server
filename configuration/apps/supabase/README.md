@@ -88,8 +88,8 @@ Depois, no app: um envio e um download de verdade, de fora da rede interna.
 Arquivos: `compose.yml` (vira `/opt/supabase/docker-compose.yml`), `supabase.env.j2` (vira `/opt/supabase/.env`),
 `config/` e `ansible/deploy.yml`. A tag é `supabase`, e só roda no host com `server=homo`.
 
-1. **Uma vez:** complete o `configuration/servers/homo/hosts.ini` com as variáveis `supabase_*` (o modelo está no
-   `inventory.ini`). Use os valores **atuais** do `/opt/supabase/.env`: senha ou JWT diferentes quebram o banco e as
+1. **Uma vez:** complete o `configuration/servers/v1.0.0/homo/hosts.ini` com as variáveis `supabase_*` (o modelo está no
+   `configuration/servers/v1.0.0/homo/hosts.ini.example`). Use os valores **atuais** do `/opt/supabase/.env`: senha ou JWT diferentes quebram o banco e as
    chaves dos apps. Só as `supabase_s3_*` são novas (`openssl rand -hex 16` / `openssl rand -hex 32`). O host continua
    `192.168.10.60`, porque as URLs usam esse nome.
 2. **Ver o que muda:**

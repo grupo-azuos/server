@@ -18,18 +18,18 @@ O desafio do Let's Encrypt é o TLS-ALPN (porta 443), o único que atravessa o p
 
 | Servidor | Roda | Docs |
 |---|---|---|
-| `prod` | VPS pública: Coolify, NetBird server + dashboard, agente NetBird, RustDesk | [servers/prod](configuration/servers/prod/README.md) |
-| `homo` | Homologação: Coolify, agente NetBird, Supabase self-hosted | [servers/homo](configuration/servers/homo/README.md) |
-| `flow` | Automações: agente NetBird, exporters | [servers/flow](configuration/servers/flow/README.md) |
-| `crm` | CRM: agente NetBird, exporters | [servers/crm](configuration/servers/crm/README.md) |
-| `core` | Sistemas internos: agente NetBird, exporters | [servers/core](configuration/servers/core/README.md) |
-| `ops` | Painel do Komodo, Prometheus + Grafana (só pela VPN), agente NetBird, exporters | [servers/ops](configuration/servers/ops/README.md) |
+| `prod` | VPS pública: Coolify, NetBird server + dashboard, agente NetBird, RustDesk | [servers/prod](configuration/servers/v1.0.0/prod/README.md) |
+| `homo` | Homologação: Coolify, agente NetBird, Supabase self-hosted | [servers/homo](configuration/servers/v1.0.0/homo/README.md) |
+| `auto` | Automações: agente NetBird, exporters | [servers/auto](configuration/servers/v1.0.1/auto/README.md) |
+| `crm` | CRM: agente NetBird, exporters | [servers/crm](configuration/servers/v1.0.1/crm/README.md) |
+| `core` | Sistemas internos: agente NetBird, exporters | [servers/core](configuration/servers/v1.0.1/core/README.md) |
+| `ops` | Painel do Komodo, Prometheus + Grafana (só pela VPN), agente NetBird, exporters | [servers/ops](configuration/servers/v1.0.1/ops/README.md) |
 
 Todos entram no NetBird. Os exporters (node-exporter + cAdvisor) rodam em todos, menos no prod, e o
 Prometheus do `ops` coleta os dados pela VPN: [apps/monitoring](configuration/apps/monitoring/README.md).
 O agente do Komodo também roda em todos, menos no prod, e o painel fica no `ops`: [apps/komodo](configuration/apps/komodo/README.md).
 Cada um tem um Caddy (borda com TLS automático; no homo, atrás da borda pela VPN), com as rotas em
-`configuration/servers/<servidor>/vars.yml`: [apps/caddy](configuration/apps/caddy/README.md).
+`configuration/servers/<versão>/<servidor>/vars.yml`: [apps/caddy](configuration/apps/caddy/README.md).
 
 **Os 5 de uma vez** (docker, netbird-client, exporters, monitoring, komodo, komodo-periphery e caddy, nessa ordem):
 
@@ -57,7 +57,7 @@ Dois workflows manuais, no mesmo formato do my-config:
   e caddy, nessa ordem).
 - **[Ansible Clean](.github/workflows/clean.yml):** mesmo caminho, escolha o serviço e se apaga os volumes.
 
-Os dois têm **dry_run** (`--check`). Servidores: `ops`, `core`, `crm` e `flow`. O `homo` é
+Os dois têm **dry_run** (`--check`). Servidores: `ops`, `core`, `crm` e `auto`. O `homo` é
 manual, pelo painel do Coolify.
 
 **Secrets**, no formato do my-config: um **Environment** por servidor (Settings → Environments, com o nome do
@@ -83,9 +83,7 @@ servidor) ou secrets com o prefixo do servidor.
 
 ```bash
 brew install ansible             # ou: sudo dnf install ansible-core
-cp configuration/servers/prod/inventory.ini configuration/servers/prod/hosts.ini
-cp configuration/servers/homo/inventory.ini configuration/servers/homo/hosts.ini
-# servidores novos: o mesmo para flow, crm, core e ops
+# em cada servidor: cp hosts.ini.example hosts.ini e preencha
 ```
 
 Preencha os `hosts.ini` (ignorados pelo git): IP, usuário, domínio e segredos de cada servidor, no mesmo
@@ -98,7 +96,7 @@ caminhos, faixa da VPN) ficam no `vars:` de `configuration/ansible/deploy.yml`.
 | `configuration/ansible/` | `deploy.yml` e `clean.yml`: chamam as tasks dos apps por tag |
 | `configuration/apps/<app>/` | `compose.yml`, `config/` e `ansible/deploy.*.yml` / `clean.*.yml` de cada app |
 | `configuration/apps/coolify/README.md` | Proxy do Traefik, modelo de labels, diagnóstico e histórico de correções |
-| `configuration/servers/<servidor>/` | `hosts.ini` (real, fora do git), `vars.yml` e README. Modelos do `hosts.ini` em `HOSTS_FORMATS.md` |
+| `configuration/servers/<versão>/<servidor>/` | `hosts.ini` (real, fora do git), `vars.yml` e README. Modelos do `hosts.ini` em `configuration/servers/<versão>/<servidor>/hosts.ini.example` |
 
 Todos os comandos rodam da raiz do repo; o `ansible.cfg` já carrega todos os inventários (um `hosts.ini` que ainda não existe só gera aviso).
 
@@ -109,7 +107,7 @@ por clone:
 git config core.hooksPath .githooks     # recusa commit fora do padrão
 git config commit.template .gitmessage  # mostra o modelo no editor
 ```
-Só um servidor: acrescente `--limit <servidor>` (`prod`, `homo`, `flow`, `crm`, `core`, `ops`).
+Só um servidor: acrescente `--limit <servidor>` (`prod`, `homo`, `auto`, `crm`, `core`, `ops`).
 
 ## Etapas
 
@@ -194,7 +192,7 @@ Se quiser, feche as portas 80/443 públicas do homo no firewall; o tráfego (e o
 
 ### 8. Servidores novos e ops
 
-Para `flow`, `crm`, `core` e `ops` (sem Coolify): Docker, agente NetBird (com a mesma Setup
+Para `auto`, `crm`, `core` e `ops` (sem Coolify): Docker, agente NetBird (com a mesma Setup
 Key) e exporters. Depois, Prometheus + Grafana no ops:
 
 ```bash

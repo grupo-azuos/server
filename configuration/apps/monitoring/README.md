@@ -4,7 +4,7 @@ Trazido do my-config (`configuration/apps/monitoring`) e dividido em duas partes
 cada servidor e o Prometheus do `ops` coleta todos pelo NetBird.
 
 ```text
-homo, flow, crm, core, ops
+homo, auto, crm, core, ops
   node-exporter  <IP NetBird>:9100   (host: CPU, RAM, disco, rede, load)
   cAdvisor       <IP NetBird>:9101   (uso de cada container Docker)
         ▲

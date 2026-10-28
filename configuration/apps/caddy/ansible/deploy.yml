@@ -2,7 +2,7 @@
 # =========================================================================
 # === CADDY ===
 # =========================================================================
-# caddy_mode (servers/<servidor>/vars.yml): edge = borda com TLS; local = atrás
+# caddy_mode (servers/<versão>/<servidor>/vars.yml): edge = borda com TLS; local = atrás
 # da borda, só HTTP no IP do NetBird. As rotas vêm de caddy_routes.
 
 - name: "[caddy] IP do NetBird"
@@ -12,7 +12,7 @@
 - name: "[caddy] Conferir modo"
   assert:
     that: caddy_mode in ['edge', 'local']
-    fail_msg: "caddy_mode deve ser edge ou local (servers/{{ server }}/vars.yml)"
+    fail_msg: "caddy_mode deve ser edge ou local (servers/<versão>/{{ server }}/vars.yml)"
   tags: [caddy]
 
 - name: "[caddy] IPs dos destinos pela VPN"

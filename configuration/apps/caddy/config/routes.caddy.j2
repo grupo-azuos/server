@@ -1,4 +1,4 @@
-# Gerado pelo Ansible a partir de caddy_routes (configuration/servers/{{ server }}/vars.yml).
+# Gerado pelo Ansible a partir de caddy_routes (configuration/servers/<versão>/{{ server }}/vars.yml).
 {% for r in caddy_routes %}
 {% set up = r.upstream if r.upstream is defined else (caddy_route_ips[r.server] ~ ':' ~ caddy_tunnel_port) %}
 

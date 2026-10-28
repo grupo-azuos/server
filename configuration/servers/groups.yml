@@ -6,15 +6,15 @@ strict: true
 groups:
   prod: server == 'prod'
   homo: server == 'homo'
-  flow: server == 'flow'
+  auto: server == 'auto'
   crm: server == 'crm'
   core: server == 'core'
   ops: server == 'ops'
   # Servidores com node-exporter + cAdvisor, coletados pelo Prometheus do ops.
   # Para monitorar o prod também, acrescente 'prod' na lista.
-  monitorados: server in ['homo', 'flow', 'crm', 'core', 'ops']
+  monitorados: server in ['homo', 'auto', 'crm', 'core', 'ops']
   # Komodo: o painel (Core) roda num servidor só; o agente (Periphery), em todos do grupo komodo.
   komodo_core: server == 'ops'
-  komodo: server in ['homo', 'flow', 'crm', 'core', 'ops']
+  komodo: server in ['homo', 'auto', 'crm', 'core', 'ops']
   # Caddy em todos; o modo (borda ou local) fica no vars.yml de cada um.
-  caddy: server in ['homo', 'flow', 'crm', 'core', 'ops']
+  caddy: server in ['homo', 'auto', 'crm', 'core', 'ops']

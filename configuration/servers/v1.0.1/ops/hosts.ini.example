@@ -1,0 +1,2 @@
+[servers]
+IP_DO_OPS ansible_user=root ansible_ssh_forward_agent=true server=ops domain=grupoazuos.com.br email=infra@grupoazuos.com.br netbird_setup_key="SETUP_KEY_DO_NETBIRD" netbird_mgmt_url=https://netbird.grupoazuos.com.br grafana_admin_password="SENHA_GRAFANA" komodo_admin_password="SENHA_KOMODO" komodo_onboarding_key=""

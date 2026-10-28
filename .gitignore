@@ -1,5 +1,5 @@
-# Inventário real com IPs e segredos. Modelos em configuration/servers/HOSTS_FORMATS.md (e inventory.ini no prod e no homo).
-configuration/servers/*/hosts.ini
+# Inventário real com IPs e segredos. Modelos em configuration/servers/<versão>/<servidor>/hosts.ini.example.
+configuration/servers/**/hosts.ini
 *.retry
 # RustDesk: .env real e chaves/banco gerados pelo servidor
 configuration/apps/rustdesk/.env

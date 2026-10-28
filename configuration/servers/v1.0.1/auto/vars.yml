@@ -1,4 +1,4 @@
-# Variáveis não secretas do servidor flow, carregadas pelo deploy.yml.
+# Variáveis não secretas do servidor auto, carregadas pelo deploy.yml.
 # Segredos ficam no hosts.ini.
 
 caddy_mode: edge

@@ -10,12 +10,12 @@ usuário ─▶ Cloudflare (só DNS) ─▶ Caddy de borda (TLS) ─┬─▶ ap
 
 | Modo | Onde | Portas | TLS |
 |---|---|---|---|
-| `edge` | ops, core, crm, flow | `80`, `443` (tcp/udp) | sim, automático |
+| `edge` | ops, core, crm, auto | `80`, `443` (tcp/udp) | sim, automático |
 | `local` | homo | `<IP NetBird>:8088` (`caddy_tunnel_port`) | não: chega pronto da borda |
 
 ## Rotas
 
-Ficam em `configuration/servers/<servidor>/vars.yml`, na lista `caddy_routes`. O Ansible gera
+Ficam em `configuration/servers/<versão>/<servidor>/vars.yml`, na lista `caddy_routes`. O Ansible gera
 `/opt/caddy/config/conf.d/routes.caddy`:
 
 ```yaml

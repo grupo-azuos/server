@@ -12,11 +12,11 @@ para o [homo](../homo/README.md).
 | NetBird Server + Dashboard | Docker (`/opt/netbird`) | `netbird.<domain>`, `3478/udp` | `netbird` |
 | NetBird Client | systemd (`netbird.service`) | `wt0` | `netbird-client` |
 | Túnel para o homo | Traefik (`/data/coolify/proxy/dynamic/homo.yaml`) | `*.homo.<domain>` | `tunnel` |
-| RustDesk (hbbs + hbbr) | Coolify, projeto `rede` (rede do host) | `21115-21117/tcp`, `21116/udp` | manual, ver [apps/rustdesk](../../apps/rustdesk/README.md) |
+| RustDesk (hbbs + hbbr) | Coolify, projeto `rede` (rede do host) | `21115-21117/tcp`, `21116/udp` | manual, ver [apps/rustdesk](../../../apps/rustdesk/README.md) |
 
 ## Inventário
 
-Copie [`inventory.ini`](inventory.ini) para `hosts.ini` (ignorado pelo git) e preencha.
+Copie [`hosts.ini.example`](hosts.ini.example) para `hosts.ini` (ignorado pelo git) e preencha. É o mesmo conteúdo das secrets do GitHub Actions.
 
 | Variável | Para quê |
 |---|---|

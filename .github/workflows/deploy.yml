@@ -13,7 +13,7 @@ on:
           - ops
           - core
           - crm
-          - flow
+          - auto
       step:
         description: 'Etapa (servidores = docker, netbird-client, exporters, monitoring, komodo, komodo-periphery e caddy)'
         required: true
@@ -52,11 +52,11 @@ jobs:
           OPS_KEY: ${{ secrets.OPS_SSH_PRIVATE_KEY }}
           CORE_KEY: ${{ secrets.CORE_SSH_PRIVATE_KEY }}
           CRM_KEY: ${{ secrets.CRM_SSH_PRIVATE_KEY }}
-          FLOW_KEY: ${{ secrets.FLOW_SSH_PRIVATE_KEY }}
+          AUTO_KEY: ${{ secrets.AUTO_SSH_PRIVATE_KEY }}
           OPS_PASSPHRASE: ${{ secrets.OPS_SSH_PASSPHRASE }}
           CORE_PASSPHRASE: ${{ secrets.CORE_SSH_PASSPHRASE }}
           CRM_PASSPHRASE: ${{ secrets.CRM_SSH_PASSPHRASE }}
-          FLOW_PASSPHRASE: ${{ secrets.FLOW_SSH_PASSPHRASE }}
+          AUTO_PASSPHRASE: ${{ secrets.AUTO_SSH_PASSPHRASE }}
         run: |
           SSH_KEY="$ENV_SSH_KEY"
           if [ -z "$SSH_KEY" ]; then
@@ -147,22 +147,22 @@ jobs:
           OPS_HOSTS: ${{ secrets.OPS_ANSIBLE_HOSTS_INI }}
           CORE_HOSTS: ${{ secrets.CORE_ANSIBLE_HOSTS_INI }}
           CRM_HOSTS: ${{ secrets.CRM_ANSIBLE_HOSTS_INI }}
-          FLOW_HOSTS: ${{ secrets.FLOW_ANSIBLE_HOSTS_INI }}
+          AUTO_HOSTS: ${{ secrets.AUTO_ANSIBLE_HOSTS_INI }}
         run: |
-          for s in ops core crm flow; do
+          for s in ops core crm auto; do
             var="${s^^}_HOSTS"
             content="${!var}"
             if [ "$s" = "$TARGET_SERVER" ] && [ -n "$ENV_HOSTS_INI" ]; then
               content="$ENV_HOSTS_INI"
             fi
             if [ -n "$content" ]; then
-              printf '%s\n' "$content" | tr -d '\r' > "configuration/servers/$s/hosts.ini"
-              chmod 600 "configuration/servers/$s/hosts.ini"
+              printf '%s\n' "$content" | tr -d '\r' > "configuration/servers/v1.0.1/$s/hosts.ini"
+              chmod 600 "configuration/servers/v1.0.1/$s/hosts.ini"
               echo "hosts.ini de $s configurado"
             fi
           done
 
-          if [ ! -f "configuration/servers/${TARGET_SERVER}/hosts.ini" ]; then
+          if [ ! -f "configuration/servers/v1.0.1/${TARGET_SERVER}/hosts.ini" ]; then
             echo "::error::Nenhum inventário para '${TARGET_SERVER}'! Cadastre 'ANSIBLE_HOSTS_INI' no Environment ou '${TARGET_SERVER^^}_ANSIBLE_HOSTS_INI' nas Secrets."
             exit 1
           fi
@@ -178,7 +178,7 @@ jobs:
           OPS_BECOME_PASS: ${{ secrets.OPS_ANSIBLE_BECOME_PASSWORD }}
           CORE_BECOME_PASS: ${{ secrets.CORE_ANSIBLE_BECOME_PASSWORD }}
           CRM_BECOME_PASS: ${{ secrets.CRM_ANSIBLE_BECOME_PASSWORD }}
-          FLOW_BECOME_PASS: ${{ secrets.FLOW_ANSIBLE_BECOME_PASSWORD }}
+          AUTO_BECOME_PASS: ${{ secrets.AUTO_ANSIBLE_BECOME_PASSWORD }}
         run: |
           BECOME_PASS="$ENV_BECOME_PASS"
           if [ -z "$BECOME_PASS" ]; then

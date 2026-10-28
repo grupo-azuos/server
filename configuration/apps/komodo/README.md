@@ -9,7 +9,7 @@ ops (grupo komodo_core)
         ▲
         │ WebSocket pela VPN, autenticado por par de chaves (o agente é quem conecta)
         │
-homo, flow, crm, core, ops (grupo komodo)
+homo, auto, crm, core, ops (grupo komodo)
   Komodo Periphery      sem porta publicada; age no Docker local (/var/run/docker.sock)
                         stacks e repos em /etc/komodo
 ```
@@ -82,7 +82,7 @@ O `/etc/komodo` dos servidores fica: lá estão os stacks publicados e os backup
 - **O agente controla o Docker inteiro do servidor** (equivale a root). Ele não publica porta e o painel
   só escuta no IP do NetBird. Mantenha assim, e dê acesso ao painel só a quem pode mexer nos servidores.
 - **Webhook do GitHub** (deploy no push): o Caddy do ops publica só `/listener/*` em
-  `https://komodo.<domain>` (rota em `servers/ops/vars.yml`); o painel continua só na VPN. Precisa do
+  `https://komodo.<domain>` (rota em `servers/v1.0.1/ops/vars.yml`); o painel continua só na VPN. Precisa do
   registro A `komodo` na Cloudflare, só DNS, com o IP do ops.
 - **Chaves.** O Core guarda o par de chaves no volume `komodo-keys`; cada agente grava a chave pública do Core
   na primeira conexão e passa a exigir a mesma. Se o volume do Core for apagado, os agentes recusam o Core
