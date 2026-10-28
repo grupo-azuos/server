@@ -1,6 +1,6 @@
 # Agentes de métricas, em todos os servidores monitorados (/opt/exporters).
 # Rede do host e escuta só no IP do NetBird (VPN_IP): o Prometheus do
-# monitoramento coleta pela VPN e nada fica exposto no IP público.
+# ops coleta pela VPN e nada fica exposto no IP público.
 services:
   node-exporter:
     image: prom/node-exporter:v1.7.0

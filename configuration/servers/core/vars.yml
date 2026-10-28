@@ -1,4 +1,4 @@
-# Variáveis não secretas do servidor automacao, carregadas pelo deploy.yml.
+# Variáveis não secretas do servidor core, carregadas pelo deploy.yml.
 # Segredos ficam no hosts.ini.
 
 caddy_mode: edge
@@ -8,3 +8,5 @@ caddy_mode: edge
 #   server: <nome>                  repassa pela VPN ao Caddy daquele servidor (modo local)
 #   path: /x/*                      (opcional) publica só esse caminho; o resto responde 404
 caddy_routes: []
+  # - hosts: ["app.{{ domain }}"]
+  #   upstream: app:3000

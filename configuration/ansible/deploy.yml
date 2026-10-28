@@ -1,7 +1,7 @@
 ---
 # Rode da raiz do repo, uma etapa por vez (ver README):
 #   ansible-playbook configuration/ansible/deploy.yml --tags <etapa>
-# Só um servidor: acrescente --limit <servidor> (prod, homo, automacao, crm, internos, monitoramento).
+# Só um servidor: acrescente --limit <servidor> (prod, homo, flow, crm, core, ops).
 # Os 5 servidores de uma vez (docker, netbird-client, exporters, monitoring, komodo, caddy):
 #   ansible-playbook configuration/ansible/deploy.yml --tags servidores
 - name: Deploy Server Infrastructure
@@ -95,7 +95,7 @@
       tags: [tunnel]
 
     # -------------------------------------------------------------------------
-    # Monitoramento: exporters nos monitorados, Prometheus + Grafana no monitoramento
+    # Monitoramento: exporters nos monitorados, Prometheus + Grafana no ops
     # -------------------------------------------------------------------------
     - name: "[exporters] Deploy node-exporter + cAdvisor"
       include_tasks: "{{ apps_dir }}/monitoring/ansible/deploy.exporters.yml"
@@ -104,7 +104,7 @@
 
     - name: "[monitoring] Deploy Prometheus + Grafana"
       include_tasks: "{{ apps_dir }}/monitoring/ansible/deploy.yml"
-      when: server == 'monitoramento'
+      when: server == 'ops'
       tags: [monitoring, servidores]
 
     # -------------------------------------------------------------------------

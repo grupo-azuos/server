@@ -10,7 +10,7 @@ usuário ─▶ Cloudflare (só DNS) ─▶ Caddy de borda (TLS) ─┬─▶ ap
 
 | Modo | Onde | Portas | TLS |
 |---|---|---|---|
-| `edge` | monitoramento, internos, crm, automacao | `80`, `443` (tcp/udp) | sim, automático |
+| `edge` | ops, core, crm, flow | `80`, `443` (tcp/udp) | sim, automático |
 | `local` | homo | `<IP NetBird>:8088` (`caddy_tunnel_port`) | não: chega pronto da borda |
 
 ## Rotas
@@ -30,7 +30,7 @@ caddy_routes:
     upstream: "{{ vpn_ip }}:9120"
 ```
 
-**App na homologação:** são duas rotas com o mesmo nome. Na borda (`monitoramento`), `server: homo`; no `homo`,
+**App na homologação:** são duas rotas com o mesmo nome. Na borda (`ops`), `server: homo`; no `homo`,
 `upstream: app:3000`. E um registro A `app.homo` na Cloudflare, só DNS, com o IP da borda.
 
 **App em produção:** uma rota no servidor onde ele roda, e um registro A com o IP daquele servidor.

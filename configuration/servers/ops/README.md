@@ -1,4 +1,4 @@
-# Servidor monitoramento
+# Servidor ops
 
 Painel do Komodo e monitoramento de todos os servidores: Prometheus coleta os exporters de cada um pelo NetBird e o Grafana mostra os painéis. Acesso só pela VPN.
 
@@ -38,11 +38,11 @@ Copie [`inventory.ini`](inventory.ini) para `hosts.ini` (ignorado pelo git) e pr
 ## Deploy
 
 ```bash
-ansible-playbook configuration/ansible/deploy.yml --tags docker --limit monitoramento
-ansible-playbook configuration/ansible/deploy.yml --tags netbird-client --limit monitoramento
-ansible-playbook configuration/ansible/deploy.yml --tags exporters --limit monitoramento
-ansible-playbook configuration/ansible/deploy.yml --tags komodo --limit monitoramento   # painel, antes dos agentes
-ansible-playbook configuration/ansible/deploy.yml --tags komodo-periphery --limit monitoramento
-ansible-playbook configuration/ansible/deploy.yml --tags caddy --limit monitoramento
-ansible-playbook configuration/ansible/deploy.yml --tags monitoring --limit monitoramento   # depois dos exporters nos outros
+ansible-playbook configuration/ansible/deploy.yml --tags docker --limit ops
+ansible-playbook configuration/ansible/deploy.yml --tags netbird-client --limit ops
+ansible-playbook configuration/ansible/deploy.yml --tags exporters --limit ops
+ansible-playbook configuration/ansible/deploy.yml --tags komodo --limit ops   # painel, antes dos agentes
+ansible-playbook configuration/ansible/deploy.yml --tags komodo-periphery --limit ops
+ansible-playbook configuration/ansible/deploy.yml --tags caddy --limit ops
+ansible-playbook configuration/ansible/deploy.yml --tags monitoring --limit ops   # depois dos exporters nos outros
 ```

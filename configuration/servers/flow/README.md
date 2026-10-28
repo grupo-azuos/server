@@ -1,4 +1,4 @@
-# Servidor automacao
+# Servidor flow
 
 Automações da empresa.
 
@@ -33,9 +33,9 @@ Copie [`inventory.ini`](inventory.ini) para `hosts.ini` (ignorado pelo git) e pr
 ## Deploy
 
 ```bash
-ansible-playbook configuration/ansible/deploy.yml --tags docker --limit automacao
-ansible-playbook configuration/ansible/deploy.yml --tags netbird-client --limit automacao
-ansible-playbook configuration/ansible/deploy.yml --tags exporters --limit automacao
-ansible-playbook configuration/ansible/deploy.yml --tags komodo-periphery --limit automacao
-ansible-playbook configuration/ansible/deploy.yml --tags caddy --limit automacao
+ansible-playbook configuration/ansible/deploy.yml --tags docker --limit flow
+ansible-playbook configuration/ansible/deploy.yml --tags netbird-client --limit flow
+ansible-playbook configuration/ansible/deploy.yml --tags exporters --limit flow
+ansible-playbook configuration/ansible/deploy.yml --tags komodo-periphery --limit flow
+ansible-playbook configuration/ansible/deploy.yml --tags caddy --limit flow
 ```

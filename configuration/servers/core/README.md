@@ -1,4 +1,4 @@
-# Servidor internos
+# Servidor core
 
 Sistemas internos da empresa.
 
@@ -33,9 +33,9 @@ Copie [`inventory.ini`](inventory.ini) para `hosts.ini` (ignorado pelo git) e pr
 ## Deploy
 
 ```bash
-ansible-playbook configuration/ansible/deploy.yml --tags docker --limit internos
-ansible-playbook configuration/ansible/deploy.yml --tags netbird-client --limit internos
-ansible-playbook configuration/ansible/deploy.yml --tags exporters --limit internos
-ansible-playbook configuration/ansible/deploy.yml --tags komodo-periphery --limit internos
-ansible-playbook configuration/ansible/deploy.yml --tags caddy --limit internos
+ansible-playbook configuration/ansible/deploy.yml --tags docker --limit core
+ansible-playbook configuration/ansible/deploy.yml --tags netbird-client --limit core
+ansible-playbook configuration/ansible/deploy.yml --tags exporters --limit core
+ansible-playbook configuration/ansible/deploy.yml --tags komodo-periphery --limit core
+ansible-playbook configuration/ansible/deploy.yml --tags caddy --limit core
 ```

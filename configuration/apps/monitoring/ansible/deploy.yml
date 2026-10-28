@@ -2,20 +2,20 @@
 # =========================================================================
 # === MONITORING (PROMETHEUS + GRAFANA) ===
 # =========================================================================
-# Só no servidor monitoramento. Coleta os exporters de todo o grupo
+# Só no servidor ops. Coleta os exporters de todo o grupo
 # `monitorados` pelo NetBird; Grafana e Prometheus escutam só no IP da VPN.
 
 - name: "[monitoring] Conferir senha do Grafana"
   assert:
     that: grafana_admin_password | default('') | length > 0
-    fail_msg: "Preencha grafana_admin_password no hosts.ini do monitoramento"
+    fail_msg: "Preencha grafana_admin_password no hosts.ini do ops"
   tags: [monitoring]
 
 - name: "[monitoring] IP do NetBird"
   include_tasks: "{{ playbook_dir }}/tasks/vpn_ip.yml"
   tags: [monitoring]
 
-# Funciona com --limit monitoramento: lê a wt0 de cada servidor por SSH.
+# Funciona com --limit ops: lê a wt0 de cada servidor por SSH.
 - name: "[monitoring] Ler interface wt0 dos servidores monitorados"
   setup:
     filter: ansible_wt0

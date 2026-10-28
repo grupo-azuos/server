@@ -140,7 +140,7 @@ cada servidor
                                   · pode ler logs e traces também
                                         │ remote write pela VPN
                                         ▼
-monitoramento
+ops
   Prometheus (+ Loki/Tempo, se quiser) ──▶ Grafana
 ```
 

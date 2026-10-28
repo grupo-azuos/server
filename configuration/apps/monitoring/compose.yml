@@ -1,4 +1,4 @@
-# Prometheus + Grafana, só no servidor monitoramento (/opt/monitoring).
+# Prometheus + Grafana, só no servidor ops (/opt/monitoring).
 # Rede do host e escuta só no IP do NetBird (VPN_IP): acesso apenas pela VPN.
 services:
   prometheus:

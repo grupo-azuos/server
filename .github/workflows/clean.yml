@@ -7,13 +7,13 @@ on:
       server:
         description: 'Servidor alvo (homo é manual, pelo painel do Coolify)'
         required: true
-        default: 'monitoramento'
+        default: 'ops'
         type: choice
         options:
-          - monitoramento
-          - internos
+          - ops
+          - core
           - crm
-          - automacao
+          - flow
       target:
         description: 'Serviço para parar e remover'
         required: true
@@ -52,14 +52,14 @@ jobs:
           TARGET_SERVER: ${{ github.event.inputs.server }}
           ENV_SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           ENV_PASSPHRASE: ${{ secrets.SSH_PASSPHRASE }}
-          MONITORAMENTO_KEY: ${{ secrets.MONITORAMENTO_SSH_PRIVATE_KEY }}
-          INTERNOS_KEY: ${{ secrets.INTERNOS_SSH_PRIVATE_KEY }}
+          OPS_KEY: ${{ secrets.OPS_SSH_PRIVATE_KEY }}
+          CORE_KEY: ${{ secrets.CORE_SSH_PRIVATE_KEY }}
           CRM_KEY: ${{ secrets.CRM_SSH_PRIVATE_KEY }}
-          AUTOMACAO_KEY: ${{ secrets.AUTOMACAO_SSH_PRIVATE_KEY }}
-          MONITORAMENTO_PASSPHRASE: ${{ secrets.MONITORAMENTO_SSH_PASSPHRASE }}
-          INTERNOS_PASSPHRASE: ${{ secrets.INTERNOS_SSH_PASSPHRASE }}
+          FLOW_KEY: ${{ secrets.FLOW_SSH_PRIVATE_KEY }}
+          OPS_PASSPHRASE: ${{ secrets.OPS_SSH_PASSPHRASE }}
+          CORE_PASSPHRASE: ${{ secrets.CORE_SSH_PASSPHRASE }}
           CRM_PASSPHRASE: ${{ secrets.CRM_SSH_PASSPHRASE }}
-          AUTOMACAO_PASSPHRASE: ${{ secrets.AUTOMACAO_SSH_PASSPHRASE }}
+          FLOW_PASSPHRASE: ${{ secrets.FLOW_SSH_PASSPHRASE }}
         run: |
           SSH_KEY="$ENV_SSH_KEY"
           if [ -z "$SSH_KEY" ]; then
@@ -147,12 +147,12 @@ jobs:
         env:
           TARGET_SERVER: ${{ github.event.inputs.server }}
           ENV_HOSTS_INI: ${{ secrets.ANSIBLE_HOSTS_INI || secrets.HOSTS_INI }}
-          MONITORAMENTO_HOSTS: ${{ secrets.MONITORAMENTO_ANSIBLE_HOSTS_INI }}
-          INTERNOS_HOSTS: ${{ secrets.INTERNOS_ANSIBLE_HOSTS_INI }}
+          OPS_HOSTS: ${{ secrets.OPS_ANSIBLE_HOSTS_INI }}
+          CORE_HOSTS: ${{ secrets.CORE_ANSIBLE_HOSTS_INI }}
           CRM_HOSTS: ${{ secrets.CRM_ANSIBLE_HOSTS_INI }}
-          AUTOMACAO_HOSTS: ${{ secrets.AUTOMACAO_ANSIBLE_HOSTS_INI }}
+          FLOW_HOSTS: ${{ secrets.FLOW_ANSIBLE_HOSTS_INI }}
         run: |
-          for s in monitoramento internos crm automacao; do
+          for s in ops core crm flow; do
             var="${s^^}_HOSTS"
             content="${!var}"
             if [ "$s" = "$TARGET_SERVER" ] && [ -n "$ENV_HOSTS_INI" ]; then
@@ -179,10 +179,10 @@ jobs:
           REMOVE_VOLUMES: ${{ github.event.inputs.remove_volumes }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}
           ENV_BECOME_PASS: ${{ secrets.ANSIBLE_BECOME_PASSWORD || secrets.BECOME_PASSWORD }}
-          MONITORAMENTO_BECOME_PASS: ${{ secrets.MONITORAMENTO_ANSIBLE_BECOME_PASSWORD }}
-          INTERNOS_BECOME_PASS: ${{ secrets.INTERNOS_ANSIBLE_BECOME_PASSWORD }}
+          OPS_BECOME_PASS: ${{ secrets.OPS_ANSIBLE_BECOME_PASSWORD }}
+          CORE_BECOME_PASS: ${{ secrets.CORE_ANSIBLE_BECOME_PASSWORD }}
           CRM_BECOME_PASS: ${{ secrets.CRM_ANSIBLE_BECOME_PASSWORD }}
-          AUTOMACAO_BECOME_PASS: ${{ secrets.AUTOMACAO_ANSIBLE_BECOME_PASSWORD }}
+          FLOW_BECOME_PASS: ${{ secrets.FLOW_ANSIBLE_BECOME_PASSWORD }}
         run: |
           BECOME_PASS="$ENV_BECOME_PASS"
           if [ -z "$BECOME_PASS" ]; then

@@ -4,7 +4,7 @@ datasources:
   - name: Prometheus
     type: prometheus
     access: proxy
-    # PROMETHEUS_URL vem do compose (IP do monitoramento no NetBird)
+    # PROMETHEUS_URL vem do compose (IP do ops no NetBird)
     url: $PROMETHEUS_URL
     isDefault: true
     editable: true

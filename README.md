@@ -20,14 +20,14 @@ O desafio do Let's Encrypt é o TLS-ALPN (porta 443), o único que atravessa o p
 |---|---|---|
 | `prod` | VPS pública: Coolify, NetBird server + dashboard, agente NetBird, RustDesk | [servers/prod](configuration/servers/prod/README.md) |
 | `homo` | Homologação: Coolify, agente NetBird, Supabase self-hosted | [servers/homo](configuration/servers/homo/README.md) |
-| `automacao` | Automações: agente NetBird, exporters | [servers/automacao](configuration/servers/automacao/README.md) |
+| `flow` | Automações: agente NetBird, exporters | [servers/flow](configuration/servers/flow/README.md) |
 | `crm` | CRM: agente NetBird, exporters | [servers/crm](configuration/servers/crm/README.md) |
-| `internos` | Sistemas internos: agente NetBird, exporters | [servers/internos](configuration/servers/internos/README.md) |
-| `monitoramento` | Painel do Komodo, Prometheus + Grafana (só pela VPN), agente NetBird, exporters | [servers/monitoramento](configuration/servers/monitoramento/README.md) |
+| `core` | Sistemas internos: agente NetBird, exporters | [servers/core](configuration/servers/core/README.md) |
+| `ops` | Painel do Komodo, Prometheus + Grafana (só pela VPN), agente NetBird, exporters | [servers/ops](configuration/servers/ops/README.md) |
 
 Todos entram no NetBird. Os exporters (node-exporter + cAdvisor) rodam em todos, menos no prod, e o
-Prometheus do `monitoramento` coleta os dados pela VPN: [apps/monitoring](configuration/apps/monitoring/README.md).
-O agente do Komodo também roda em todos, menos no prod, e o painel fica no `monitoramento`: [apps/komodo](configuration/apps/komodo/README.md).
+Prometheus do `ops` coleta os dados pela VPN: [apps/monitoring](configuration/apps/monitoring/README.md).
+O agente do Komodo também roda em todos, menos no prod, e o painel fica no `ops`: [apps/komodo](configuration/apps/komodo/README.md).
 Cada um tem um Caddy (borda com TLS automático; no homo, atrás da borda pela VPN), com as rotas em
 `configuration/servers/<servidor>/vars.yml`: [apps/caddy](configuration/apps/caddy/README.md).
 
@@ -57,7 +57,7 @@ Dois workflows manuais, no mesmo formato do my-config:
   e caddy, nessa ordem).
 - **[Ansible Clean](.github/workflows/clean.yml):** mesmo caminho, escolha o serviço e se apaga os volumes.
 
-Os dois têm **dry_run** (`--check`). Servidores: `monitoramento`, `internos`, `crm` e `automacao`. O `homo` é
+Os dois têm **dry_run** (`--check`). Servidores: `ops`, `core`, `crm` e `flow`. O `homo` é
 manual, pelo painel do Coolify.
 
 **Secrets**, no formato do my-config: um **Environment** por servidor (Settings → Environments, com o nome do
@@ -85,7 +85,7 @@ servidor) ou secrets com o prefixo do servidor.
 brew install ansible             # ou: sudo dnf install ansible-core
 cp configuration/servers/prod/inventory.ini configuration/servers/prod/hosts.ini
 cp configuration/servers/homo/inventory.ini configuration/servers/homo/hosts.ini
-# servidores novos: o mesmo para automacao, crm, internos e monitoramento
+# servidores novos: o mesmo para flow, crm, core e ops
 ```
 
 Preencha os `hosts.ini` (ignorados pelo git): IP, usuário, domínio e segredos de cada servidor, no mesmo
@@ -109,7 +109,7 @@ por clone:
 git config core.hooksPath .githooks     # recusa commit fora do padrão
 git config commit.template .gitmessage  # mostra o modelo no editor
 ```
-Só um servidor: acrescente `--limit <servidor>` (`prod`, `homo`, `automacao`, `crm`, `internos`, `monitoramento`).
+Só um servidor: acrescente `--limit <servidor>` (`prod`, `homo`, `flow`, `crm`, `core`, `ops`).
 
 ## Etapas
 
@@ -192,24 +192,24 @@ curl https://teste.homo.<domain>       # whoami: X-Real-Ip / X-Forwarded-For com
 
 Se quiser, feche as portas 80/443 públicas do homo no firewall; o tráfego (e o desafio ACME) chega só pelo túnel.
 
-### 8. Servidores novos e monitoramento
+### 8. Servidores novos e ops
 
-Para `automacao`, `crm`, `internos` e `monitoramento` (sem Coolify): Docker, agente NetBird (com a mesma Setup
-Key) e exporters. Depois, Prometheus + Grafana no monitoramento:
+Para `flow`, `crm`, `core` e `ops` (sem Coolify): Docker, agente NetBird (com a mesma Setup
+Key) e exporters. Depois, Prometheus + Grafana no ops:
 
 ```bash
 ansible-playbook configuration/ansible/deploy.yml --tags docker
 ansible-playbook configuration/ansible/deploy.yml --tags netbird-client
 ansible-playbook configuration/ansible/deploy.yml --tags exporters
-ansible-playbook configuration/ansible/deploy.yml --tags monitoring --limit monitoramento
+ansible-playbook configuration/ansible/deploy.yml --tags monitoring --limit ops
 ```
 
 A etapa `coolify` agora só roda no prod e no homo. Detalhes e dashboards: [apps/monitoring](configuration/apps/monitoring/README.md).
-Conferir: `http://<IP do monitoramento no NetBird>:9090/targets` com todos `UP`, e o Grafana em `:3000`.
+Conferir: `http://<IP do ops no NetBird>:9090/targets` com todos `UP`, e o Grafana em `:3000`.
 
 ### 9. Komodo
 
-Painel no `monitoramento` (com `komodo_admin_password`), onboarding key criada nele, depois os agentes:
+Painel no `ops` (com `komodo_admin_password`), onboarding key criada nele, depois os agentes:
 
 ```bash
 ansible-playbook configuration/ansible/deploy.yml --tags komodo --limit komodo_core
@@ -217,7 +217,7 @@ ansible-playbook configuration/ansible/deploy.yml --tags komodo --limit komodo_c
 ansible-playbook configuration/ansible/deploy.yml --tags komodo-periphery
 ```
 
-Conferir: `http://<IP do monitoramento no NetBird>:9120`, com todos os servidores em **Servers**. Domínios vêm do Caddy
+Conferir: `http://<IP do ops no NetBird>:9120`, com todos os servidores em **Servers**. Domínios vêm do Caddy
 de cada servidor; detalhes em [apps/komodo](configuration/apps/komodo/README.md).
 
 ## Cuidados

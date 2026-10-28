@@ -1,4 +1,4 @@
-# Variáveis não secretas do servidor monitoramento, carregadas pelo deploy.yml.
+# Variáveis não secretas do servidor ops, carregadas pelo deploy.yml.
 # Segredos ficam no hosts.ini.
 
 caddy_mode: edge

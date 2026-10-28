@@ -9,6 +9,6 @@ caddy_mode: local
 #   server: <nome>                  repassa pela VPN ao Caddy daquele servidor (modo local)
 #   path: /x/*                      (opcional) publica só esse caminho; o resto responde 404
 caddy_routes: []
-  # Mesmo nome da rota na borda (monitoramento), apontando para o app daqui
+  # Mesmo nome da rota na borda (ops), apontando para o app daqui
   # - hosts: ["app.homo.{{ domain }}"]
   #   upstream: app:3000

@@ -50,7 +50,7 @@
     # =========================================================================
     - name: "[monitoring] Teardown Prometheus + Grafana"
       include_tasks: "{{ apps_dir }}/monitoring/ansible/clean.yml"
-      when: server == 'monitoramento'
+      when: server == 'ops'
       tags: [monitoring]
 
     - name: "[exporters] Teardown node-exporter + cAdvisor"
