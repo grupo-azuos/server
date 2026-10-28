@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       server:
-        description: 'Servidor alvo (homo não: é alterado só pelo painel do Coolify)'
+        description: 'Servidor alvo (homo é manual, pelo painel do Coolify)'
         required: true
         default: 'monitoramento'
         type: choice
@@ -14,7 +14,6 @@ on:
           - internos
           - crm
           - automacao
-          - prod
       step:
         description: 'Etapa (servidores = docker, netbird-client, exporters, monitoring, komodo, komodo-periphery e caddy)'
         required: true
@@ -29,9 +28,6 @@ on:
           - komodo
           - komodo-periphery
           - caddy
-          - coolify
-          - netbird
-          - tunnel
       dry_run:
         description: 'Modo simulação (--check)?'
         required: false
@@ -50,11 +46,32 @@ jobs:
 
       - name: Configurar chave SSH
         env:
-          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          PASSPHRASE: ${{ secrets.SSH_PASSPHRASE }}
+          TARGET_SERVER: ${{ github.event.inputs.server }}
+          ENV_SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ENV_PASSPHRASE: ${{ secrets.SSH_PASSPHRASE }}
+          MONITORAMENTO_KEY: ${{ secrets.MONITORAMENTO_SSH_PRIVATE_KEY }}
+          INTERNOS_KEY: ${{ secrets.INTERNOS_SSH_PRIVATE_KEY }}
+          CRM_KEY: ${{ secrets.CRM_SSH_PRIVATE_KEY }}
+          AUTOMACAO_KEY: ${{ secrets.AUTOMACAO_SSH_PRIVATE_KEY }}
+          MONITORAMENTO_PASSPHRASE: ${{ secrets.MONITORAMENTO_SSH_PASSPHRASE }}
+          INTERNOS_PASSPHRASE: ${{ secrets.INTERNOS_SSH_PASSPHRASE }}
+          CRM_PASSPHRASE: ${{ secrets.CRM_SSH_PASSPHRASE }}
+          AUTOMACAO_PASSPHRASE: ${{ secrets.AUTOMACAO_SSH_PASSPHRASE }}
         run: |
+          SSH_KEY="$ENV_SSH_KEY"
           if [ -z "$SSH_KEY" ]; then
-            echo "::error::Chave SSH não encontrada! Cadastre a secret 'SSH_PRIVATE_KEY'."
+            var="${TARGET_SERVER^^}_KEY"
+            SSH_KEY="${!var}"
+          fi
+
+          PASSPHRASE="$ENV_PASSPHRASE"
+          if [ -z "$PASSPHRASE" ]; then
+            var="${TARGET_SERVER^^}_PASSPHRASE"
+            PASSPHRASE="${!var}"
+          fi
+
+          if [ -z "$SSH_KEY" ]; then
+            echo "::error::Chave SSH não encontrada para o servidor '$TARGET_SERVER'! Cadastre 'SSH_PRIVATE_KEY' no Environment ou '${TARGET_SERVER^^}_SSH_PRIVATE_KEY' nas Secrets."
             exit 1
           fi
 
@@ -119,21 +136,25 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ansible
 
-      # Todos os inventários, não só o do alvo: o Prometheus lista os monitorados e o
+      # Como no my-config: o hosts.ini do alvo vem do Environment (ANSIBLE_HOSTS_INI) ou da
+      # secret <SERVIDOR>_ANSIBLE_HOSTS_INI. Os outros servidores vêm só das secrets com prefixo
+      # (Environment de outro servidor não é visível aqui): o Prometheus lista os monitorados e o
       # agente do Komodo procura o Core. O --limit restringe onde o playbook roda.
       - name: Configurar inventários (hosts.ini)
         env:
           TARGET_SERVER: ${{ github.event.inputs.server }}
-          PROD_HOSTS: ${{ secrets.PROD_HOSTS_INI }}
-          HOMO_HOSTS: ${{ secrets.HOMO_HOSTS_INI }}
-          AUTOMACAO_HOSTS: ${{ secrets.AUTOMACAO_HOSTS_INI }}
-          CRM_HOSTS: ${{ secrets.CRM_HOSTS_INI }}
-          INTERNOS_HOSTS: ${{ secrets.INTERNOS_HOSTS_INI }}
-          MONITORAMENTO_HOSTS: ${{ secrets.MONITORAMENTO_HOSTS_INI }}
+          ENV_HOSTS_INI: ${{ secrets.ANSIBLE_HOSTS_INI || secrets.HOSTS_INI }}
+          MONITORAMENTO_HOSTS: ${{ secrets.MONITORAMENTO_ANSIBLE_HOSTS_INI }}
+          INTERNOS_HOSTS: ${{ secrets.INTERNOS_ANSIBLE_HOSTS_INI }}
+          CRM_HOSTS: ${{ secrets.CRM_ANSIBLE_HOSTS_INI }}
+          AUTOMACAO_HOSTS: ${{ secrets.AUTOMACAO_ANSIBLE_HOSTS_INI }}
         run: |
-          for s in prod homo automacao crm internos monitoramento; do
+          for s in monitoramento internos crm automacao; do
             var="${s^^}_HOSTS"
             content="${!var}"
+            if [ "$s" = "$TARGET_SERVER" ] && [ -n "$ENV_HOSTS_INI" ]; then
+              content="$ENV_HOSTS_INI"
+            fi
             if [ -n "$content" ]; then
               printf '%s\n' "$content" | tr -d '\r' > "configuration/servers/$s/hosts.ini"
               chmod 600 "configuration/servers/$s/hosts.ini"
@@ -142,7 +163,7 @@ jobs:
           done
 
           if [ ! -f "configuration/servers/${TARGET_SERVER}/hosts.ini" ]; then
-            echo "::error::Sem inventário para '${TARGET_SERVER}'! Cadastre a secret '${TARGET_SERVER^^}_HOSTS_INI'."
+            echo "::error::Nenhum inventário para '${TARGET_SERVER}'! Cadastre 'ANSIBLE_HOSTS_INI' no Environment ou '${TARGET_SERVER^^}_ANSIBLE_HOSTS_INI' nas Secrets."
             exit 1
           fi
 
@@ -153,7 +174,27 @@ jobs:
           TARGET_SERVER: ${{ github.event.inputs.server }}
           STEP: ${{ github.event.inputs.step }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}
+          ENV_BECOME_PASS: ${{ secrets.ANSIBLE_BECOME_PASSWORD || secrets.BECOME_PASSWORD }}
+          MONITORAMENTO_BECOME_PASS: ${{ secrets.MONITORAMENTO_ANSIBLE_BECOME_PASSWORD }}
+          INTERNOS_BECOME_PASS: ${{ secrets.INTERNOS_ANSIBLE_BECOME_PASSWORD }}
+          CRM_BECOME_PASS: ${{ secrets.CRM_ANSIBLE_BECOME_PASSWORD }}
+          AUTOMACAO_BECOME_PASS: ${{ secrets.AUTOMACAO_ANSIBLE_BECOME_PASSWORD }}
         run: |
+          BECOME_PASS="$ENV_BECOME_PASS"
+          if [ -z "$BECOME_PASS" ]; then
+            var="${TARGET_SERVER^^}_BECOME_PASS"
+            BECOME_PASS="${!var}"
+          fi
+
+          EXTRA_VARS=""
+          export BECOME_PASS
+          if [ -n "$BECOME_PASS" ]; then
+            umask 077
+            BECOME_PASS="$BECOME_PASS" python3 -c 'import json, os; json.dump({"ansible_become_password": os.environ["BECOME_PASS"]}, open("/tmp/become.json", "w"))'
+            EXTRA_VARS="--extra-vars @/tmp/become.json"
+          fi
+          trap 'rm -f /tmp/become.json' EXIT
+
           CHECK_ARG=""
           if [ "$DRY_RUN" = "true" ]; then
             CHECK_ARG="--check"
@@ -161,7 +202,7 @@ jobs:
 
           # vars.yml de cada servidor é carregado pelo próprio deploy.yml
           ansible-playbook configuration/ansible/deploy.yml \
-            --tags "$STEP" --limit "$TARGET_SERVER" $CHECK_ARG
+            --tags "$STEP" --limit "$TARGET_SERVER" $CHECK_ARG $EXTRA_VARS
 
       - name: Sair do NetBird
         if: always()

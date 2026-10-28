@@ -57,25 +57,27 @@ Dois workflows manuais, no mesmo formato do my-config:
   e caddy, nessa ordem).
 - **[Ansible Clean](.github/workflows/clean.yml):** mesmo caminho, escolha o serviço e se apaga os volumes.
 
-Os dois têm **dry_run** (`--check`). O `homo` fica fora: ele é alterado só pelo painel do Coolify.
+Os dois têm **dry_run** (`--check`). Servidores: `monitoramento`, `internos`, `crm` e `automacao`. O `homo` é
+manual, pelo painel do Coolify.
 
-**Secrets** (Settings → Secrets and variables → Actions):
+**Secrets**, no formato do my-config: um **Environment** por servidor (Settings → Environments, com o nome do
+servidor) ou secrets com o prefixo do servidor.
 
-| Secret | Para quê |
-|---|---|
-| `SSH_PRIVATE_KEY` | Chave privada que entra como `root` em todos os servidores |
-| `SSH_PASSPHRASE` | *(Opcional)* Passphrase da chave |
-| `<SERVIDOR>_HOSTS_INI` | O `hosts.ini` de cada servidor (`MONITORAMENTO_HOSTS_INI`, `INTERNOS_HOSTS_INI`, `CRM_HOSTS_INI`, `AUTOMACAO_HOSTS_INI`, `PROD_HOSTS_INI`, `HOMO_HOSTS_INI`) |
-| `NETBIRD_CI_SETUP_KEY` | *(Opcional)* Setup Key **efêmera** do NetBird: o runner entra na VPN antes do SSH |
+| Environment (do servidor) | Ou secret com prefixo | Para quê |
+|---|---|---|
+| `SSH_PRIVATE_KEY` | `<SERVIDOR>_SSH_PRIVATE_KEY` | Chave `github-actions-server` (root) |
+| `ANSIBLE_HOSTS_INI` | `<SERVIDOR>_ANSIBLE_HOSTS_INI` | `hosts.ini` do servidor |
+| `SSH_PASSPHRASE` | `<SERVIDOR>_SSH_PASSPHRASE` | *(Opcional)* Passphrase da chave |
+| `ANSIBLE_BECOME_PASSWORD` | `<SERVIDOR>_ANSIBLE_BECOME_PASSWORD` | *(Opcional)* Senha do sudo, se não for root |
+| `NETBIRD_CI_SETUP_KEY` | | *(Opcional)* Setup Key **efêmera**: o runner entra na VPN antes do SSH |
 
-- **Todos os `hosts.ini`, não só o do alvo.** O Prometheus lista os monitorados e o agente do Komodo procura o
-  Core, então o workflow grava todos os que existirem e roda com `--limit <servidor>`.
-- **SSH fechado no firewall:** com `NETBIRD_CI_SETUP_KEY`, os `hosts.ini` das secrets usam o IP do NetBird de
-  cada servidor. Sem ela, o SSH vai pelo IP público (útil na primeira subida, antes da VPN).
-- **Primeira subida:** `docker`, `netbird-client`, `komodo`, onboarding key no painel e na secret, depois
-  `komodo-periphery`, `caddy` e `monitoring` (detalhes nas etapas 8 e 9 abaixo).
-- **Environments** com o nome do servidor (`monitoramento`, `crm`…) são opcionais: servem para exigir aprovação
-  antes do deploy. Secrets cadastradas no Environment valem só para aquele servidor.
+- **`<SERVIDOR>_ANSIBLE_HOSTS_INI` de todos, além do Environment.** As etapas `monitoring` e `komodo-periphery`
+  leem os outros servidores (o Prometheus lista os monitorados, o agente procura o Core), e o workflow só vê o
+  Environment do alvo. Ele grava todos os que existirem e roda com `--limit <servidor>`.
+- **SSH fechado no firewall:** com `NETBIRD_CI_SETUP_KEY`, os `hosts.ini` usam o IP do NetBird de cada servidor.
+  Sem ela, o SSH vai pelo IP público (primeira subida).
+- **Primeira subida:** `docker`, `netbird-client`, `komodo`, onboarding key no painel e no `hosts.ini`, depois
+  `komodo-periphery`, `caddy` e `monitoring` (etapas 8 e 9 abaixo).
 
 ## Preparação (uma vez)
 
