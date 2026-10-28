@@ -1,0 +1,22 @@
+---
+- name: "[cockpit] Parar e desabilitar Cockpit"
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: no
+  loop:
+    - cockpit.socket
+    - cockpit
+  failed_when: false
+  tags: [cockpit]
+
+- name: "[cockpit] Remover override do cockpit.socket"
+  file:
+    path: /etc/systemd/system/cockpit.socket.d
+    state: absent
+  tags: [cockpit]
+
+- name: "[cockpit] Recarregar systemd"
+  systemd:
+    daemon_reload: yes
+  tags: [cockpit]

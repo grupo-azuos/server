@@ -30,6 +30,7 @@
 #   monitoring configuration/apps/monitoring/
 #   komodo     configuration/apps/komodo/
 #   caddy      configuration/apps/caddy/
+#   cockpit    configuration/apps/cockpit/
 #   docs       .md na raiz
 #   versions   versions/ (versões da infra)
 #   ci         .github/

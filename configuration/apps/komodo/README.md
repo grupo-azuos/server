@@ -51,7 +51,7 @@ Pré-requisitos: o servidor já está no NetBird (`netbird-client`) e já tem Do
 **1. Painel**: com `komodo_admin_password` no `hosts.ini` do `ops`:
 
 ```bash
-ansible-playbook configuration/ansible/deploy.yml --tags komodo --limit komodo_core
+ansible-playbook configuration/ansible/deploy.yml --tags komodo-core --limit komodo_core
 ```
 
 Conferir: `http://<IP NetBird do ops>:9120`, login `admin` com a senha do `hosts.ini`.
@@ -72,7 +72,7 @@ Depois do primeiro registro, a onboarding key não é mais necessária para aque
 
 ```bash
 ansible-playbook configuration/ansible/clean.yml --tags komodo-periphery   # + -e remove_volumes=true apaga as chaves
-ansible-playbook configuration/ansible/clean.yml --tags komodo --limit komodo_core
+ansible-playbook configuration/ansible/clean.yml --tags komodo-core --limit komodo_core
 ```
 
 O `/etc/komodo` dos servidores fica: lá estão os stacks publicados e os backups do banco.

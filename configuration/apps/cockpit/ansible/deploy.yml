@@ -1,0 +1,57 @@
+---
+# =========================================================================
+# === COCKPIT ===
+# =========================================================================
+# Pacote do sistema (não container): administra o próprio host. Escuta só no
+# IP do NetBird, na porta cockpit_port (a 9090 é do Prometheus no ops).
+
+- name: "[cockpit] IP do NetBird"
+  include_tasks: "{{ playbook_dir }}/tasks/vpn_ip.yml"
+  tags: [cockpit]
+
+- name: "[cockpit] Instalar Cockpit"
+  package:
+    name: cockpit
+    state: present
+  tags: [cockpit]
+
+- name: "[cockpit] Criar diretório do override do cockpit.socket"
+  file:
+    path: /etc/systemd/system/cockpit.socket.d
+    state: directory
+    mode: '0755'
+  tags: [cockpit]
+
+# FreeBind: o socket sobe mesmo se a wt0 ainda não existir no boot
+- name: "[cockpit] Escutar só no IP do NetBird"
+  copy:
+    dest: /etc/systemd/system/cockpit.socket.d/listen.conf
+    content: |
+      [Socket]
+      ListenStream=
+      ListenStream={{ vpn_ip }}:{{ cockpit_port }}
+      FreeBind=yes
+    mode: '0644'
+  register: cockpit_socket
+  tags: [cockpit]
+
+- name: "[cockpit] Configurar cockpit.conf"
+  template:
+    src: "{{ apps_dir }}/cockpit/config/cockpit.conf.j2"
+    dest: /etc/cockpit/cockpit.conf
+    mode: '0644'
+  register: cockpit_conf
+  tags: [cockpit]
+
+- name: "[cockpit] Habilitar e reiniciar cockpit.socket"
+  systemd:
+    name: cockpit.socket
+    state: "{{ 'restarted' if (cockpit_socket.changed or cockpit_conf.changed) else 'started' }}"
+    enabled: yes
+    daemon_reload: yes
+  tags: [cockpit]
+
+- name: "[cockpit] Endereço"
+  debug:
+    msg: "Cockpit: https://{{ vpn_ip }}:{{ cockpit_port }} (só pela VPN, login com usuário do sistema)"
+  tags: [cockpit]

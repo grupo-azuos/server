@@ -5,79 +5,79 @@
 # Só no servidor ops. Coleta os exporters de todo o grupo
 # `monitorados` pelo NetBird; Grafana e Prometheus escutam só no IP da VPN.
 
-- name: "[monitoring] Conferir senha do Grafana"
+- name: "[prometheus-grafana] Conferir senha do Grafana"
   assert:
     that: grafana_admin_password | default('') | length > 0
     fail_msg: "Preencha grafana_admin_password no hosts.ini do ops"
-  tags: [monitoring]
+  tags: [prometheus-grafana]
 
-- name: "[monitoring] IP do NetBird"
+- name: "[prometheus-grafana] IP do NetBird"
   include_tasks: "{{ playbook_dir }}/tasks/vpn_ip.yml"
-  tags: [monitoring]
+  tags: [prometheus-grafana]
 
 # Funciona com --limit ops: lê a wt0 de cada servidor por SSH.
-- name: "[monitoring] Ler interface wt0 dos servidores monitorados"
+- name: "[prometheus-grafana] Ler interface wt0 dos servidores monitorados"
   setup:
     filter: ansible_wt0
   delegate_to: "{{ item }}"
   delegate_facts: true
   loop: "{{ groups['monitorados'] }}"
   when: hostvars[item].vpn_ip is not defined
-  tags: [monitoring]
+  tags: [prometheus-grafana]
 
-- name: "[monitoring] Montar lista de IPs do NetBird"
+- name: "[prometheus-grafana] Montar lista de IPs do NetBird"
   set_fact:
     monitored_vpn_ips: "{{ monitored_vpn_ips | default({}) | combine({item: hostvars[item].vpn_ip | default(hostvars[item].ansible_wt0.ipv4.address | default(''))}) }}"
   loop: "{{ groups['monitorados'] }}"
-  tags: [monitoring]
+  tags: [prometheus-grafana]
 
-- name: "[monitoring] Conferir IPs do NetBird"
+- name: "[prometheus-grafana] Conferir IPs do NetBird"
   assert:
     that: monitored_vpn_ips | dict2items | selectattr('value', 'equalto', '') | list | length == 0
     fail_msg: "Sem IP do NetBird em: {{ monitored_vpn_ips | dict2items | selectattr('value', 'equalto', '') | map(attribute='key') | join(', ') }}. Rode netbird-client nesses servidores ou preencha vpn_ip no hosts.ini"
-  tags: [monitoring]
+  tags: [prometheus-grafana]
 
-- name: "[monitoring] Criar diretórios de deploy"
+- name: "[prometheus-grafana] Criar diretórios de deploy"
   file:
     path: "{{ monitoring_path }}/{{ item }}"
     state: directory
     mode: '0755'
   loop: ["", config, dashboards]
-  tags: [monitoring]
+  tags: [prometheus-grafana]
 
-- name: "[monitoring] Gerar prometheus.yml com os servidores monitorados"
+- name: "[prometheus-grafana] Gerar prometheus.yml com os servidores monitorados"
   template:
     src: "{{ apps_dir }}/monitoring/config/prometheus.yml.j2"
     dest: "{{ monitoring_path }}/config/prometheus.yml"
     mode: '0644'
   register: prometheus_config
-  tags: [monitoring]
+  tags: [prometheus-grafana]
 
-- name: "[monitoring] Copiar provisionamento do Grafana"
+- name: "[prometheus-grafana] Copiar provisionamento do Grafana"
   copy:
     src: "{{ apps_dir }}/monitoring/config/grafana"
     dest: "{{ monitoring_path }}/config/"
     mode: '0644'
     directory_mode: '0755'
   register: grafana_provisioning
-  tags: [monitoring]
+  tags: [prometheus-grafana]
 
-- name: "[monitoring] Copiar dashboards"
+- name: "[prometheus-grafana] Copiar dashboards"
   copy:
     src: "{{ apps_dir }}/monitoring/dashboards/"
     dest: "{{ monitoring_path }}/dashboards/"
     mode: '0644'
-  tags: [monitoring]
+  tags: [prometheus-grafana]
 
-- name: "[monitoring] Copiar docker-compose"
+- name: "[prometheus-grafana] Copiar docker-compose"
   copy:
     src: "{{ apps_dir }}/monitoring/compose.yml"
     dest: "{{ monitoring_path }}/docker-compose.yml"
     mode: '0644'
-  tags: [monitoring]
+  tags: [prometheus-grafana]
 
 # A senha só vale na primeira subida; depois, troque pelo Grafana.
-- name: "[monitoring] Criar .env"
+- name: "[prometheus-grafana] Criar .env"
   copy:
     dest: "{{ monitoring_path }}/.env"
     content: |
@@ -86,25 +86,25 @@
       GRAFANA_ADMIN_PASSWORD={{ grafana_admin_password }}
     mode: '0600'
   no_log: true
-  tags: [monitoring]
+  tags: [prometheus-grafana]
 
-- name: "[monitoring] Subir Prometheus e Grafana"
+- name: "[prometheus-grafana] Subir Prometheus e Grafana"
   command: docker compose up -d --remove-orphans
   args:
     chdir: "{{ monitoring_path }}"
-  tags: [monitoring]
+  tags: [prometheus-grafana]
 
-- name: "[monitoring] Recarregar prometheus.yml"
+- name: "[prometheus-grafana] Recarregar prometheus.yml"
   command: docker kill -s HUP prometheus
   when: prometheus_config.changed
-  tags: [monitoring]
+  tags: [prometheus-grafana]
 
-- name: "[monitoring] Reiniciar Grafana para ler o provisionamento"
+- name: "[prometheus-grafana] Reiniciar Grafana para ler o provisionamento"
   command: docker restart grafana
   when: grafana_provisioning.changed
-  tags: [monitoring]
+  tags: [prometheus-grafana]
 
-- name: "[monitoring] Conferir alvos no Prometheus"
+- name: "[prometheus-grafana] Conferir alvos no Prometheus"
   uri:
     url: "http://{{ vpn_ip }}:9090/api/v1/targets?state=active"
     return_content: yes
@@ -112,9 +112,9 @@
   retries: 10
   delay: 3
   until: prometheus_targets.status == 200
-  tags: [monitoring]
+  tags: [prometheus-grafana]
 
-- name: "[monitoring] Alvos fora do ar (podem levar 15s para subir)"
+- name: "[prometheus-grafana] Alvos fora do ar (podem levar 15s para subir)"
   debug:
     msg: "{{ prometheus_targets.json.data.activeTargets | rejectattr('health', 'equalto', 'up') | map(attribute='scrapeUrl') | list }}"
-  tags: [monitoring]
+  tags: [prometheus-grafana]

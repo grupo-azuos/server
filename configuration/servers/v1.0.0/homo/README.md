@@ -12,7 +12,7 @@ Homologação. O Coolify daqui atende `*.homo.<domain>` e tem os certificados do
 | NetBird Client | systemd (`netbird.service`) | `wt0` | `netbird-client` |
 | Supabase (self-hosted) | Docker (`/opt/supabase`) | `http://<ip>:8001` (API, Studio e S3), `:5432` | `supabase`, ver [apps/supabase](../../../apps/supabase/README.md) |
 | S3 público do Supabase | Dynamic Configuration `supabase-s3.yaml` do proxy | `https://s3.homo.<domain>/storage/v1/s3` | painel, ver [apps/supabase](../../../apps/supabase/README.md#endpoint-s3-público-links-assinados) |
-| node-exporter + cAdvisor | Docker (`/opt/exporters`) | `<IP NetBird>:9100`, `:9101` | `exporters`, ver [apps/monitoring](../../../apps/monitoring/README.md) |
+| node-exporter + cAdvisor | Docker (`/opt/exporters`) | `<IP NetBird>:9100`, `:9101` | `node-exporter-cadvisor`, ver [apps/monitoring](../../../apps/monitoring/README.md) |
 | Komodo Periphery | Docker (`/opt/komodo-periphery`) | conecta no Core pela VPN | `komodo-periphery`, ver [apps/komodo](../../../apps/komodo/README.md) |
 | Caddy | Docker (`/opt/caddy`) | local, `<IP NetBird>:8088`, atrás da borda | `caddy`, ver [apps/caddy](../../../apps/caddy/README.md) |
 
@@ -47,5 +47,5 @@ Copie [`hosts.ini.example`](hosts.ini.example) para `hosts.ini` (ignorado pelo g
 
 A instalação inicial (etapas `coolify` e `netbird-client`) usa
 `ansible-playbook configuration/ansible/deploy.yml --tags <etapa> --limit homo`. Depois disso, as mudanças são
-feitas pelo painel do Coolify. Exceções: os exporters, o agente do Komodo e o Caddy (`--tags exporters,komodo-periphery,caddy --limit homo`) e o Supabase (`/opt/supabase`), atualizado por
+feitas pelo painel do Coolify. Exceções: os exporters, o agente do Komodo e o Caddy (`--tags node-exporter-cadvisor,komodo-periphery,caddy --limit homo`) e o Supabase (`/opt/supabase`), atualizado por
 `ansible-playbook configuration/ansible/deploy.yml --tags supabase --limit homo` (ver [apps/supabase](../../../apps/supabase/README.md)).

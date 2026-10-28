@@ -8,7 +8,8 @@ Sistemas internos da empresa.
 |---|---|---|---|
 | Docker | systemd | | `docker` |
 | NetBird Client | systemd (`netbird.service`) | `wt0` | `netbird-client` |
-| node-exporter + cAdvisor | Docker (`/opt/exporters`) | `<IP NetBird>:9100`, `:9101` | `exporters`, ver [apps/monitoring](../../../apps/monitoring/README.md) |
+| Cockpit | systemd (`cockpit.socket`) | `https://<IP NetBird>:9091`, só pela VPN | `cockpit`, ver [apps/cockpit](../../../apps/cockpit/README.md) |
+| node-exporter + cAdvisor | Docker (`/opt/exporters`) | `<IP NetBird>:9100`, `:9101` | `node-exporter-cadvisor`, ver [apps/monitoring](../../../apps/monitoring/README.md) |
 | Komodo Periphery | Docker (`/opt/komodo-periphery`) | conecta no Core pela VPN | `komodo-periphery`, ver [apps/komodo](../../../apps/komodo/README.md) |
 | Caddy | Docker (`/opt/caddy`) | borda, TLS automático, `:80`/`:443` | `caddy`, ver [apps/caddy](../../../apps/caddy/README.md) |
 
@@ -35,7 +36,8 @@ Copie [`hosts.ini.example`](hosts.ini.example) para `hosts.ini` (ignorado pelo g
 ```bash
 ansible-playbook configuration/ansible/deploy.yml --tags docker --limit core
 ansible-playbook configuration/ansible/deploy.yml --tags netbird-client --limit core
-ansible-playbook configuration/ansible/deploy.yml --tags exporters --limit core
+ansible-playbook configuration/ansible/deploy.yml --tags cockpit --limit core
+ansible-playbook configuration/ansible/deploy.yml --tags node-exporter-cadvisor --limit core
 ansible-playbook configuration/ansible/deploy.yml --tags komodo-periphery --limit core
 ansible-playbook configuration/ansible/deploy.yml --tags caddy --limit core
 ```

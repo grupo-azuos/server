@@ -1,5 +1,5 @@
-name: Ansible Deploy
-run-name: Deploy em ${{ inputs.server }} (${{ inputs.step }})
+name: ansible-deploy
+run-name: ansible-deploy ${{ inputs.server }} ${{ inputs.step }}
 
 on:
   workflow_dispatch:
@@ -15,17 +15,18 @@ on:
           - crm
           - auto
       step:
-        description: 'Etapa (servidores = docker, netbird-client, exporters, monitoring, komodo, komodo-periphery e caddy)'
+        description: 'Serviço (all = todos, na ordem da lista)'
         required: true
-        default: 'servidores'
+        default: 'all'
         type: choice
         options:
-          - servidores
+          - all
           - docker
           - netbird-client
-          - exporters
-          - monitoring
-          - komodo
+          - cockpit
+          - node-exporter-cadvisor
+          - prometheus-grafana
+          - komodo-core
           - komodo-periphery
           - caddy
       dry_run:
@@ -36,7 +37,7 @@ on:
 
 jobs:
   deploy:
-    name: Deploy em ${{ github.event.inputs.server }} (${{ github.event.inputs.step }})
+    name: ansible-deploy ${{ github.event.inputs.server }} ${{ github.event.inputs.step }}
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.server }}
 
@@ -198,6 +199,10 @@ jobs:
           CHECK_ARG=""
           if [ "$DRY_RUN" = "true" ]; then
             CHECK_ARG="--check"
+          fi
+
+          if [ "$STEP" = "all" ]; then
+            STEP="docker,netbird-client,cockpit,node-exporter-cadvisor,prometheus-grafana,komodo-core,komodo-periphery,caddy"
           fi
 
           # vars.yml de cada servidor é carregado pelo próprio deploy.yml

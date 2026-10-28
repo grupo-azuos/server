@@ -4,17 +4,17 @@
 # =========================================================================
 # Só no servidor do grupo komodo_core. Painel em http://<IP NetBird>:9120.
 
-- name: "[komodo] Conferir senha do admin"
+- name: "[komodo-core] Conferir senha do admin"
   assert:
     that: komodo_admin_password | default('') | length > 0
     fail_msg: "Preencha komodo_admin_password no hosts.ini do servidor do Komodo Core"
-  tags: [komodo]
+  tags: [komodo-core]
 
-- name: "[komodo] IP do NetBird"
+- name: "[komodo-core] IP do NetBird"
   include_tasks: "{{ playbook_dir }}/tasks/vpn_ip.yml"
-  tags: [komodo]
+  tags: [komodo-core]
 
-- name: "[komodo] Criar diretórios"
+- name: "[komodo-core] Criar diretórios"
   file:
     path: "{{ item }}"
     state: directory
@@ -22,31 +22,31 @@
   loop:
     - "{{ komodo_path }}"
     - /etc/komodo/backups
-  tags: [komodo]
+  tags: [komodo-core]
 
-- name: "[komodo] Copiar docker-compose"
+- name: "[komodo-core] Copiar docker-compose"
   copy:
     src: "{{ apps_dir }}/komodo/compose.core.yml"
     dest: "{{ komodo_path }}/docker-compose.yml"
     mode: '0644'
-  tags: [komodo]
+  tags: [komodo-core]
 
-- name: "[komodo] Sortear senha do banco"
+- name: "[komodo-core] Sortear senha do banco"
   set_fact:
     komodo_db_password: "{{ lookup('password', '/dev/null chars=ascii_letters,digits length=32') }}"
   no_log: true
-  tags: [komodo]
+  tags: [komodo-core]
 
-- name: "[komodo] Criar secrets.env (não sobrescrever se já existir)"
+- name: "[komodo-core] Criar secrets.env (não sobrescrever se já existir)"
   template:
     src: "{{ apps_dir }}/komodo/config/secrets.env.j2"
     dest: "{{ komodo_path }}/secrets.env"
     force: false
     mode: '0600'
   no_log: true
-  tags: [komodo]
+  tags: [komodo-core]
 
-- name: "[komodo] Criar .env (IP do NetBird e versões)"
+- name: "[komodo-core] Criar .env (IP do NetBird e versões)"
   copy:
     dest: "{{ komodo_path }}/.env"
     content: |
@@ -55,19 +55,19 @@
       KOMODO_VERSION={{ komodo_version }}
       MONGO_VERSION={{ komodo_mongo_version }}
     mode: '0644'
-  tags: [komodo]
+  tags: [komodo-core]
 
-- name: "[komodo] Subir Mongo e Komodo Core"
+- name: "[komodo-core] Subir Mongo e Komodo Core"
   command: docker compose up -d --remove-orphans
   args:
     chdir: "{{ komodo_path }}"
-  tags: [komodo]
+  tags: [komodo-core]
 
-- name: "[komodo] Conferir painel na VPN"
+- name: "[komodo-core] Conferir painel na VPN"
   uri:
     url: "http://{{ vpn_ip }}:9120"
   register: komodo_check
   retries: 20
   delay: 3
   until: komodo_check.status == 200
-  tags: [komodo]
+  tags: [komodo-core]

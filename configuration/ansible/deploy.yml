@@ -2,8 +2,8 @@
 # Rode da raiz do repo, uma etapa por vez (ver README):
 #   ansible-playbook configuration/ansible/deploy.yml --tags <etapa>
 # Só um servidor: acrescente --limit <servidor> (prod, homo, auto, crm, core, ops).
-# Os 5 servidores de uma vez (docker, netbird-client, exporters, monitoring, komodo, caddy):
-#   ansible-playbook configuration/ansible/deploy.yml --tags servidores
+# Tudo de um servidor, na ordem:
+#   --tags docker,netbird-client,cockpit,node-exporter-cadvisor,prometheus-grafana,komodo-core,komodo-periphery,caddy
 - name: Deploy Server Infrastructure
   hosts: all
   become: yes
@@ -20,6 +20,8 @@
     komodo_version: "2.3.3"
     komodo_mongo_version: "8.0"
     caddy_path: "/opt/caddy"
+    # Cockpit no IP do NetBird; a 9090 é do Prometheus no ops
+    cockpit_port: 9091
     caddy_version: "2.11"
     caddy_mode: edge
     caddy_routes: []
@@ -61,7 +63,7 @@
     - name: "[docker] Instalar Docker"
       include_tasks: "tasks/docker.yml"
       when: server not in ['prod', 'homo']
-      tags: [docker, servidores]
+      tags: [docker]
 
     # -------------------------------------------------------------------------
     # NetBird
@@ -73,7 +75,15 @@
 
     - name: "[netbird-client] Conectar NetBird Client"
       include_tasks: "{{ apps_dir }}/netbird/ansible/deploy.client.yml"
-      tags: [netbird-client, servidores]
+      tags: [netbird-client]
+
+    # -------------------------------------------------------------------------
+    # Cockpit: painel do sistema, só pela VPN
+    # -------------------------------------------------------------------------
+    - name: "[cockpit] Deploy Cockpit"
+      include_tasks: "{{ apps_dir }}/cockpit/ansible/deploy.yml"
+      when: inventory_hostname in groups['cockpit'] | default([])
+      tags: [cockpit]
 
     # -------------------------------------------------------------------------
     # Supabase self-hosted (homo, /opt/supabase)
@@ -99,28 +109,28 @@
     # -------------------------------------------------------------------------
     # Monitoramento: exporters nos monitorados, Prometheus + Grafana no ops
     # -------------------------------------------------------------------------
-    - name: "[exporters] Deploy node-exporter + cAdvisor"
+    - name: "[node-exporter-cadvisor] Deploy node-exporter + cAdvisor"
       include_tasks: "{{ apps_dir }}/monitoring/ansible/deploy.exporters.yml"
       when: inventory_hostname in groups['monitorados'] | default([])
-      tags: [exporters, servidores]
+      tags: [node-exporter-cadvisor]
 
-    - name: "[monitoring] Deploy Prometheus + Grafana"
+    - name: "[prometheus-grafana] Deploy Prometheus + Grafana"
       include_tasks: "{{ apps_dir }}/monitoring/ansible/deploy.yml"
       when: server == 'ops'
-      tags: [monitoring, servidores]
+      tags: [prometheus-grafana]
 
     # -------------------------------------------------------------------------
     # Komodo: Core (painel) no komodo_core, agente em todo servidor do grupo komodo
     # -------------------------------------------------------------------------
-    - name: "[komodo] Deploy Komodo Core"
+    - name: "[komodo-core] Deploy Komodo Core"
       include_tasks: "{{ apps_dir }}/komodo/ansible/deploy.core.yml"
       when: inventory_hostname in groups['komodo_core'] | default([])
-      tags: [komodo, servidores]
+      tags: [komodo-core]
 
     - name: "[komodo-periphery] Deploy Komodo Periphery"
       include_tasks: "{{ apps_dir }}/komodo/ansible/deploy.periphery.yml"
       when: inventory_hostname in groups['komodo'] | default([])
-      tags: [komodo-periphery, servidores]
+      tags: [komodo-periphery]
 
     # -------------------------------------------------------------------------
     # Caddy: borda com TLS ou local atrás da borda (servers/<versão>/<servidor>/vars.yml)
@@ -128,4 +138,4 @@
     - name: "[caddy] Deploy Caddy"
       include_tasks: "{{ apps_dir }}/caddy/ansible/deploy.yml"
       when: inventory_hostname in groups['caddy'] | default([])
-      tags: [caddy, servidores]
+      tags: [caddy]

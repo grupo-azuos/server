@@ -38,6 +38,14 @@
       tags: [netbird]
 
     # =========================================================================
+    # === COCKPIT ===
+    # =========================================================================
+    - name: "[cockpit] Teardown Cockpit"
+      include_tasks: "{{ apps_dir }}/cockpit/ansible/clean.yml"
+      when: inventory_hostname in groups['cockpit'] | default([])
+      tags: [cockpit]
+
+    # =========================================================================
     # === SUPABASE ===
     # =========================================================================
     - name: "[supabase] Teardown Supabase"
@@ -48,15 +56,15 @@
     # =========================================================================
     # === MONITORAMENTO ===
     # =========================================================================
-    - name: "[monitoring] Teardown Prometheus + Grafana"
+    - name: "[prometheus-grafana] Teardown Prometheus + Grafana"
       include_tasks: "{{ apps_dir }}/monitoring/ansible/clean.yml"
       when: server == 'ops'
-      tags: [monitoring]
+      tags: [prometheus-grafana]
 
-    - name: "[exporters] Teardown node-exporter + cAdvisor"
+    - name: "[node-exporter-cadvisor] Teardown node-exporter + cAdvisor"
       include_tasks: "{{ apps_dir }}/monitoring/ansible/clean.exporters.yml"
       when: inventory_hostname in groups['monitorados'] | default([])
-      tags: [exporters]
+      tags: [node-exporter-cadvisor]
 
     # =========================================================================
     # === KOMODO ===
@@ -66,10 +74,10 @@
       when: inventory_hostname in groups['komodo'] | default([])
       tags: [komodo-periphery]
 
-    - name: "[komodo] Teardown Komodo Core"
+    - name: "[komodo-core] Teardown Komodo Core"
       include_tasks: "{{ apps_dir }}/komodo/ansible/clean.core.yml"
       when: inventory_hostname in groups['komodo_core'] | default([])
-      tags: [komodo]
+      tags: [komodo-core]
 
     # =========================================================================
     # === CADDY ===

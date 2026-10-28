@@ -31,10 +31,10 @@ O agente do Komodo também roda em todos, menos no prod, e o painel fica no `ops
 Cada um tem um Caddy (borda com TLS automático; no homo, atrás da borda pela VPN), com as rotas em
 `configuration/servers/<versão>/<servidor>/vars.yml`: [apps/caddy](configuration/apps/caddy/README.md).
 
-**Os 5 de uma vez** (docker, netbird-client, exporters, monitoring, komodo, komodo-periphery e caddy, nessa ordem):
+**Tudo de uma vez**, nessa ordem:
 
 ```bash
-ansible-playbook configuration/ansible/deploy.yml --tags servidores
+ansible-playbook configuration/ansible/deploy.yml --tags docker,netbird-client,cockpit,node-exporter-cadvisor,prometheus-grafana,komodo-core,komodo-periphery,caddy
 ```
 
 Na primeira vez a onboarding key ainda não existe (ela é criada no painel do Komodo), então os agentes sobem
@@ -52,10 +52,9 @@ mas não entram no painel. Crie a chave em **Settings → Onboarding**, preencha
 
 Dois workflows manuais, no mesmo formato do my-config:
 
-- **[Ansible Deploy](.github/workflows/deploy.yml):** **Actions → Ansible Deploy → Run workflow**, escolha o
-  servidor e a etapa (`servidores` roda docker, netbird-client, exporters, monitoring, komodo, komodo-periphery
-  e caddy, nessa ordem).
-- **[Ansible Clean](.github/workflows/clean.yml):** mesmo caminho, escolha o serviço e se apaga os volumes.
+- **[ansible-deploy](.github/workflows/deploy.yml):** **Actions → ansible-deploy → Run workflow**, escolha o
+  servidor e o serviço (`all` roda `docker`, `netbird-client`, `cockpit`, `node-exporter-cadvisor`, `prometheus-grafana`, `komodo-core`, `komodo-periphery`, `caddy`, nessa ordem).
+- **[ansible-clean](.github/workflows/clean.yml):** mesmo caminho, escolha o serviço e se apaga os volumes.
 
 Os dois têm **dry_run** (`--check`). Servidores: `ops`, `core`, `crm` e `auto`. O `homo` é
 manual, pelo painel do Coolify.
@@ -71,13 +70,13 @@ servidor) ou secrets com o prefixo do servidor.
 | `ANSIBLE_BECOME_PASSWORD` | `<SERVIDOR>_ANSIBLE_BECOME_PASSWORD` | *(Opcional)* Senha do sudo, se não for root |
 | `NETBIRD_CI_SETUP_KEY` | | *(Opcional)* Setup Key **efêmera**: o runner entra na VPN antes do SSH |
 
-- **`<SERVIDOR>_ANSIBLE_HOSTS_INI` de todos, além do Environment.** As etapas `monitoring` e `komodo-periphery`
+- **`<SERVIDOR>_ANSIBLE_HOSTS_INI` de todos, além do Environment.** As etapas `prometheus-grafana` e `komodo-periphery`
   leem os outros servidores (o Prometheus lista os monitorados, o agente procura o Core), e o workflow só vê o
   Environment do alvo. Ele grava todos os que existirem e roda com `--limit <servidor>`.
 - **SSH fechado no firewall:** com `NETBIRD_CI_SETUP_KEY`, os `hosts.ini` usam o IP do NetBird de cada servidor.
   Sem ela, o SSH vai pelo IP público (primeira subida).
-- **Primeira subida:** `docker`, `netbird-client`, `komodo`, onboarding key no painel e no `hosts.ini`, depois
-  `komodo-periphery`, `caddy` e `monitoring` (etapas 8 e 9 abaixo).
+- **Primeira subida:** `all`. Depois crie a onboarding key no painel do Komodo, ponha no `hosts.ini` e rode
+  `komodo-periphery` de novo (etapa 9 abaixo).
 
 ## Preparação (uma vez)
 
@@ -198,8 +197,8 @@ Key) e exporters. Depois, Prometheus + Grafana no ops:
 ```bash
 ansible-playbook configuration/ansible/deploy.yml --tags docker
 ansible-playbook configuration/ansible/deploy.yml --tags netbird-client
-ansible-playbook configuration/ansible/deploy.yml --tags exporters
-ansible-playbook configuration/ansible/deploy.yml --tags monitoring --limit ops
+ansible-playbook configuration/ansible/deploy.yml --tags node-exporter-cadvisor
+ansible-playbook configuration/ansible/deploy.yml --tags prometheus-grafana --limit ops
 ```
 
 A etapa `coolify` agora só roda no prod e no homo. Detalhes e dashboards: [apps/monitoring](configuration/apps/monitoring/README.md).
@@ -210,7 +209,7 @@ Conferir: `http://<IP do ops no NetBird>:9090/targets` com todos `UP`, e o Grafa
 Painel no `ops` (com `komodo_admin_password`), onboarding key criada nele, depois os agentes:
 
 ```bash
-ansible-playbook configuration/ansible/deploy.yml --tags komodo --limit komodo_core
+ansible-playbook configuration/ansible/deploy.yml --tags komodo-core --limit komodo_core
 # no painel: Settings → Onboarding → nova chave em komodo_onboarding_key nos hosts.ini
 ansible-playbook configuration/ansible/deploy.yml --tags komodo-periphery
 ```

@@ -1,5 +1,5 @@
-name: Ansible Clean
-run-name: Clean em ${{ inputs.server }} (${{ inputs.target }})
+name: ansible-clean
+run-name: ansible-clean ${{ inputs.server }} ${{ inputs.target }}
 
 on:
   workflow_dispatch:
@@ -17,14 +17,15 @@ on:
       target:
         description: 'Serviço para parar e remover'
         required: true
-        default: 'monitoring'
+        default: 'prometheus-grafana'
         type: choice
         options:
-          - monitoring
-          - exporters
-          - komodo
+          - prometheus-grafana
+          - node-exporter-cadvisor
+          - komodo-core
           - komodo-periphery
           - caddy
+          - cockpit
           - netbird-client
       remove_volumes:
         description: 'Apagar volumes de dados persistentes?'
@@ -39,7 +40,7 @@ on:
 
 jobs:
   clean:
-    name: Clean em ${{ github.event.inputs.server }} (${{ github.event.inputs.target }})
+    name: ansible-clean ${{ github.event.inputs.server }} ${{ github.event.inputs.target }}
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.server }}
 

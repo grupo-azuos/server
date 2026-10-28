@@ -2,7 +2,7 @@
 # Mesmo padrão do commitlint do template, sem depender de Node:  [tipo](local): Mensagem
 # Ative uma vez por clone:  git config core.hooksPath .githooks
 types='feat|fix|refactor|test|docs|style|perf|build|ci|chore|merge'
-scopes='ansible|servers|coolify|netbird|rustdesk|supabase|monitoring|komodo|caddy|docs|versions|ci|git|claude'
+scopes='ansible|servers|coolify|netbird|rustdesk|supabase|monitoring|komodo|caddy|cockpit|docs|versions|ci|git|claude'
 
 header=$(grep -v '^#' "$1" | sed '/^[[:space:]]*$/d' | head -n 1)
 

@@ -37,14 +37,14 @@ Pré-requisito: o servidor já está no NetBird (etapa `netbird-client`), e os s
 
 ```bash
 # 1. Agentes em todos os monitorados
-ansible-playbook configuration/ansible/deploy.yml --tags exporters
+ansible-playbook configuration/ansible/deploy.yml --tags node-exporter-cadvisor
 
 # 2. Prometheus + Grafana (lê o IP do NetBird de cada monitorado por SSH)
-ansible-playbook configuration/ansible/deploy.yml --tags monitoring --limit ops
+ansible-playbook configuration/ansible/deploy.yml --tags prometheus-grafana --limit ops
 ```
 
 O IP de cada servidor vem da interface `wt0`. Se precisar fixar, use `vpn_ip=` na linha do `hosts.ini`.
-Ao fim, a etapa `monitoring` lista os alvos que ainda não estão `up`.
+Ao fim, a etapa `prometheus-grafana` lista os alvos que ainda não estão `up`.
 
 Conferir:
 - `http://<IP do ops>:9090/targets`: todos os alvos `UP`.
@@ -70,8 +70,8 @@ o app precisa expor `/metrics`. O plano está em [METRICAS-APPS.md](METRICAS-APP
 ## Remover
 
 ```bash
-ansible-playbook configuration/ansible/clean.yml --tags monitoring --limit ops   # + -e remove_volumes=true apaga o histórico
-ansible-playbook configuration/ansible/clean.yml --tags exporters
+ansible-playbook configuration/ansible/clean.yml --tags prometheus-grafana --limit ops   # + -e remove_volumes=true apaga o histórico
+ansible-playbook configuration/ansible/clean.yml --tags node-exporter-cadvisor
 ```
 
 ## Cuidados

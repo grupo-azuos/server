@@ -8,12 +8,13 @@ Painel do Komodo e monitoramento de todos os servidores: Prometheus coleta os ex
 |---|---|---|---|
 | Docker | systemd | | `docker` |
 | NetBird Client | systemd (`netbird.service`) | `wt0` | `netbird-client` |
-| node-exporter + cAdvisor | Docker (`/opt/exporters`) | `<IP NetBird>:9100`, `:9101` | `exporters`, ver [apps/monitoring](../../../apps/monitoring/README.md) |
-| Komodo Core + Mongo | Docker (`/opt/komodo`) | `http://<IP NetBird>:9120` | `komodo` |
+| Cockpit | systemd (`cockpit.socket`) | `https://<IP NetBird>:9091`, só pela VPN | `cockpit`, ver [apps/cockpit](../../../apps/cockpit/README.md) |
+| node-exporter + cAdvisor | Docker (`/opt/exporters`) | `<IP NetBird>:9100`, `:9101` | `node-exporter-cadvisor`, ver [apps/monitoring](../../../apps/monitoring/README.md) |
+| Komodo Core + Mongo | Docker (`/opt/komodo`) | `http://<IP NetBird>:9120` | `komodo-core` |
 | Komodo Periphery | Docker (`/opt/komodo-periphery`) | conecta no Core pela VPN | `komodo-periphery`, ver [apps/komodo](../../../apps/komodo/README.md) |
 | Caddy | Docker (`/opt/caddy`) | borda, TLS automático, `:80`/`:443` | `caddy`, ver [apps/caddy](../../../apps/caddy/README.md) |
-| Prometheus | Docker (`/opt/monitoring`) | `http://<IP NetBird>:9090` | `monitoring` |
-| Grafana | Docker (`/opt/monitoring`) | `http://<IP NetBird>:3000` | `monitoring` |
+| Prometheus | Docker (`/opt/monitoring`) | `http://<IP NetBird>:9090` | `prometheus-grafana` |
+| Grafana | Docker (`/opt/monitoring`) | `http://<IP NetBird>:3000` | `prometheus-grafana` |
 
 Sem Coolify.
 
@@ -40,9 +41,10 @@ Copie [`hosts.ini.example`](hosts.ini.example) para `hosts.ini` (ignorado pelo g
 ```bash
 ansible-playbook configuration/ansible/deploy.yml --tags docker --limit ops
 ansible-playbook configuration/ansible/deploy.yml --tags netbird-client --limit ops
-ansible-playbook configuration/ansible/deploy.yml --tags exporters --limit ops
-ansible-playbook configuration/ansible/deploy.yml --tags komodo --limit ops   # painel, antes dos agentes
+ansible-playbook configuration/ansible/deploy.yml --tags cockpit --limit ops
+ansible-playbook configuration/ansible/deploy.yml --tags node-exporter-cadvisor --limit ops
+ansible-playbook configuration/ansible/deploy.yml --tags komodo-core --limit ops   # painel, antes dos agentes
 ansible-playbook configuration/ansible/deploy.yml --tags komodo-periphery --limit ops
 ansible-playbook configuration/ansible/deploy.yml --tags caddy --limit ops
-ansible-playbook configuration/ansible/deploy.yml --tags monitoring --limit ops   # depois dos exporters nos outros
+ansible-playbook configuration/ansible/deploy.yml --tags prometheus-grafana --limit ops   # depois do node-exporter-cadvisor nos outros
 ```

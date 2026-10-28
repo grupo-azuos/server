@@ -1,17 +1,17 @@
 ---
-- name: "[monitoring] Parar e remover Prometheus e Grafana"
+- name: "[prometheus-grafana] Parar e remover Prometheus e Grafana"
   command: docker rm -f grafana prometheus
   failed_when: false
-  tags: [monitoring]
+  tags: [prometheus-grafana]
 
-- name: "[monitoring] Remover volumes do Prometheus e Grafana (se -e remove_volumes=true)"
+- name: "[prometheus-grafana] Remover volumes do Prometheus e Grafana (se -e remove_volumes=true)"
   command: docker volume rm prometheus-data grafana-data
   failed_when: false
   when: remove_volumes | default(false) | bool
-  tags: [monitoring]
+  tags: [prometheus-grafana]
 
-- name: "[monitoring] Remover diretório de deploy"
+- name: "[prometheus-grafana] Remover diretório de deploy"
   file:
     path: "{{ monitoring_path }}"
     state: absent
-  tags: [monitoring]
+  tags: [prometheus-grafana]
