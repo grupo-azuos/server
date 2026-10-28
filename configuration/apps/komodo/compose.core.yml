@@ -2,6 +2,10 @@
 # Base: compose/mongo.compose.yaml oficial (v2), sem o Periphery: o agente deste
 # servidor sobe como em todos os outros (compose.periphery.yml).
 # O painel escuta só no IP do NetBird (VPN_IP).
+networks:
+  caddy:
+    external: true
+
 services:
   mongo:
     image: mongo:${MONGO_VERSION:?}
@@ -26,6 +30,10 @@ services:
       - mongo
     ports:
       - "${VPN_IP:?}:9120:9120"
+    # O Caddy publica só os webhooks (/listener) por esta rede
+    networks:
+      - default
+      - caddy
     env_file: ./secrets.env
     environment:
       KOMODO_DATABASE_ADDRESS: mongo:27017

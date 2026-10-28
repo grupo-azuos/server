@@ -11,7 +11,7 @@ caddy_routes:
   # Webhooks do GitHub para o Komodo: só /listener fica público, o painel segue só na VPN
   - hosts: ["komodo.{{ domain }}"]
     path: /listener/*
-    upstream: "{{ vpn_ip }}:9120"
+    upstream: komodo-core:9120
   # Homologação: a borda emite o certificado e repassa pela VPN ao Caddy do homo
   # - hosts: ["app.homo.{{ domain }}"]
   #   server: homo

@@ -18,5 +18,7 @@ groups:
   komodo: server in ['homo', 'auto', 'crm', 'core', 'ops']
   # Caddy em todos; o modo (borda ou local) fica no vars.yml de cada um.
   caddy: server in ['homo', 'auto', 'crm', 'core', 'ops']
+  # Servidor da VPN (NetBird server + dashboard). No prod pelo Traefik, no ops pelo Caddy.
+  netbird_server: server in ['prod', 'ops']
   # Cockpit (painel do sistema, só pela VPN) nos servidores da DigitalOcean.
   cockpit: server in ['ops', 'core', 'crm', 'auto']

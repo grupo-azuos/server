@@ -1,0 +1,40 @@
+# NetBird server + dashboard publicados pelo Caddy do servidor (rede docker `caddy`).
+# Mesmo formato do my-config. No prod (Coolify) quem publica é o Traefik: compose.yml.
+networks:
+  caddy:
+    external: true
+
+services:
+  netbird-dashboard:
+    image: netbirdio/dashboard:${NETBIRD_DASHBOARD_VERSION}
+    container_name: netbird-dashboard
+    restart: unless-stopped
+    networks:
+      - caddy
+    env_file:
+      - ./dashboard.env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "2"
+
+  netbird-server:
+    image: netbirdio/netbird-server:${NETBIRD_SERVER_VERSION}
+    container_name: netbird-server
+    restart: unless-stopped
+    networks:
+      - caddy
+    ports:
+      - "3478:3478/udp"
+    volumes:
+      - ./config.yaml:/etc/netbird/config.yaml
+      - /opt/netbird/data:/var/lib/netbird
+    command: ["--config", "/etc/netbird/config.yaml"]
+    environment:
+      - NETBIRD_CONFIG=/etc/netbird/config.yaml
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "2"

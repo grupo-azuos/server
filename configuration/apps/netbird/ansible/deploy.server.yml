@@ -1,6 +1,7 @@
 ---
 # =========================================================================
-# === NETBIRD SERVER (direto no Docker, publicado pelo Traefik do Coolify) ===
+# === NETBIRD SERVER (direto no Docker) ===
+# Publicado pelo Caddy do servidor (grupo caddy) ou, no prod, pelo Traefik do Coolify.
 # =========================================================================
 
 - name: "[netbird] Criar diretórios de deploy do NetBird"
@@ -13,9 +14,20 @@
     - "{{ netbird_path }}/data"
   tags: [netbird]
 
+- name: "[netbird] Quem publica: Caddy do servidor ou Traefik do Coolify"
+  set_fact:
+    netbird_on_caddy: "{{ inventory_hostname in groups['caddy'] | default([]) }}"
+  tags: [netbird]
+
+- name: "[netbird] Conferir Caddy no ar (rode a etapa caddy antes)"
+  command: docker inspect caddy
+  changed_when: false
+  when: netbird_on_caddy
+  tags: [netbird]
+
 - name: "[netbird] Copiar docker-compose do NetBird"
   copy:
-    src: "{{ apps_dir }}/netbird/compose.yml"
+    src: "{{ apps_dir }}/netbird/{{ 'compose.caddy.yml' if netbird_on_caddy else 'compose.yml' }}"
     dest: "{{ netbird_path }}/docker-compose.yml"
     mode: '0644'
   tags: [netbird]
@@ -61,13 +73,14 @@
     regexp: '^(\s*)(- ["'']?--entrypoints\.https\.address=:443["'']?)\s*$(?![\s\S]*readTimeout=0)'
     replace: '\1\2\n\1- ''--entrypoints.https.transport.respondingTimeouts.readTimeout=0'''
   register: proxy_patch
+  when: not netbird_on_caddy
   tags: [netbird]
 
 - name: "[netbird] Recriar coolify-proxy com o ajuste"
   command: docker compose up -d --force-recreate
   args:
     chdir: "{{ coolify_proxy_path }}"
-  when: proxy_patch is changed
+  when: not netbird_on_caddy and proxy_patch is changed
   tags: [netbird]
 
 - name: "[netbird] Abrir porta STUN (3478/udp) no firewall"
@@ -79,8 +92,22 @@
   changed_when: false
   tags: [netbird]
 
+- name: "[netbird] Publicar netbird.{{ domain }} no Caddy"
+  template:
+    src: "{{ apps_dir }}/netbird/config/netbird.caddy.j2"
+    dest: "{{ caddy_path }}/config/conf.d/netbird.caddy"
+    mode: '0644'
+  register: netbird_caddy
+  when: netbird_on_caddy
+  tags: [netbird]
+
 - name: "[netbird] Subir containers do NetBird"
   command: docker compose up -d --force-recreate
   args:
     chdir: "{{ netbird_path }}"
+  tags: [netbird]
+
+- name: "[netbird] Recarregar Caddy"
+  command: docker exec caddy caddy reload --config /etc/caddy/Caddyfile
+  when: netbird_on_caddy and netbird_caddy is changed
   tags: [netbird]

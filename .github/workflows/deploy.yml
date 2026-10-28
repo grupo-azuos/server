@@ -22,13 +22,14 @@ on:
         options:
           - all
           - docker
+          - caddy
+          - netbird
           - netbird-client
           - cockpit
           - node-exporter-cadvisor
           - prometheus-grafana
           - komodo-core
           - komodo-periphery
-          - caddy
       dry_run:
         description: 'Modo simulação (--check)?'
         required: false
@@ -202,7 +203,7 @@ jobs:
           fi
 
           if [ "$STEP" = "all" ]; then
-            STEP="docker,netbird-client,cockpit,node-exporter-cadvisor,prometheus-grafana,komodo-core,komodo-periphery,caddy"
+            STEP="docker,caddy,netbird,netbird-client,cockpit,node-exporter-cadvisor,prometheus-grafana,komodo-core,komodo-periphery"
           fi
 
           # vars.yml de cada servidor é carregado pelo próprio deploy.yml

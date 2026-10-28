@@ -17,12 +17,12 @@
     creates: /usr/bin/netbird
   tags: [netbird-client]
 
-- name: "[netbird-client] Garantir resolução de loopback do NetBird no /etc/hosts (prod)"
+- name: "[netbird-client] Garantir resolução de loopback do NetBird no /etc/hosts (servidor da VPN)"
   lineinfile:
     path: /etc/hosts
     line: "127.0.0.1 {{ netbird_domain }}"
     state: present
-  when: server == 'prod'
+  when: inventory_hostname in groups['netbird_server'] | default([])
   tags: [netbird-client]
 
 - name: "[netbird-client] Iniciar e habilitar serviço do NetBird"

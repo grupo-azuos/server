@@ -3,7 +3,7 @@
 #   ansible-playbook configuration/ansible/deploy.yml --tags <etapa>
 # Só um servidor: acrescente --limit <servidor> (prod, homo, auto, crm, core, ops).
 # Tudo de um servidor, na ordem:
-#   --tags docker,netbird-client,cockpit,node-exporter-cadvisor,prometheus-grafana,komodo-core,komodo-periphery,caddy
+#   --tags docker,caddy,netbird,netbird-client,cockpit,node-exporter-cadvisor,prometheus-grafana,komodo-core,komodo-periphery
 - name: Deploy Server Infrastructure
   hosts: all
   become: yes
@@ -70,7 +70,7 @@
     # -------------------------------------------------------------------------
     - name: "[netbird] Deploy NetBird Server"
       include_tasks: "{{ apps_dir }}/netbird/ansible/deploy.server.yml"
-      when: server == 'prod'
+      when: inventory_hostname in groups['netbird_server'] | default([])
       tags: [netbird]
 
     - name: "[netbird-client] Conectar NetBird Client"

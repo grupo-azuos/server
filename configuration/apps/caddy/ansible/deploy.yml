@@ -5,8 +5,10 @@
 # caddy_mode (servers/<versão>/<servidor>/vars.yml): edge = borda com TLS; local = atrás
 # da borda, só HTTP no IP do NetBird. As rotas vêm de caddy_routes.
 
+# Só o modo local (atrás da borda) escuta no IP do NetBird
 - name: "[caddy] IP do NetBird"
   include_tasks: "{{ playbook_dir }}/tasks/vpn_ip.yml"
+  when: caddy_mode == 'local'
   tags: [caddy]
 
 - name: "[caddy] Conferir modo"
@@ -59,7 +61,7 @@
       CADDY_VERSION={{ caddy_version }}
       EMAIL={{ email }}
       VPN_CIDR={{ vpn_cidr }}
-      VPN_IP={{ vpn_ip }}
+      VPN_IP={{ vpn_ip | default('') }}
       CADDY_TUNNEL_PORT={{ caddy_tunnel_port }}
     mode: '0644'
   tags: [caddy]

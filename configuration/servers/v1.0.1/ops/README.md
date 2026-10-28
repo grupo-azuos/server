@@ -7,6 +7,7 @@ Painel do Komodo e monitoramento de todos os servidores: Prometheus coleta os ex
 | Serviço | Onde | Endereço | Etapa |
 |---|---|---|---|
 | Docker | systemd | | `docker` |
+| NetBird Server + Dashboard | Docker (`/opt/netbird`) | `https://netbird.<domain>`, `3478/udp` | `netbird`, ver [apps/netbird](../../../apps/netbird/README.md) |
 | NetBird Client | systemd (`netbird.service`) | `wt0` | `netbird-client` |
 | Cockpit | systemd (`cockpit.socket`) | `https://<IP NetBird>:9091`, só pela VPN | `cockpit`, ver [apps/cockpit](../../../apps/cockpit/README.md) |
 | node-exporter + cAdvisor | Docker (`/opt/exporters`) | `<IP NetBird>:9100`, `:9101` | `node-exporter-cadvisor`, ver [apps/monitoring](../../../apps/monitoring/README.md) |

@@ -27,6 +27,7 @@ on:
           - caddy
           - cockpit
           - netbird-client
+          - netbird
       remove_volumes:
         description: 'Apagar volumes de dados persistentes?'
         required: false

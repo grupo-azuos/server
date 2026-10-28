@@ -34,7 +34,7 @@
     # =========================================================================
     - name: "[netbird] Teardown NetBird Server"
       include_tasks: "{{ apps_dir }}/netbird/ansible/clean.server.yml"
-      when: server == 'prod'
+      when: inventory_hostname in groups['netbird_server'] | default([])
       tags: [netbird]
 
     # =========================================================================

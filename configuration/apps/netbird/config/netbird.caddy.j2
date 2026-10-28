@@ -1,0 +1,15 @@
+# Gerado pelo Ansible (etapa netbird). Mesmo formato do my-config.
+{{ netbird_domain }} {
+	encode zstd gzip
+
+	# gRPC nativo (Signal e Management)
+	@grpc header Content-Type application/grpc*
+	reverse_proxy @grpc h2c://netbird-server:80
+
+	# WebSocket, API, Relay e autenticação
+	@backend path /relay* /ws-proxy* /api* /oauth2* /signalexchange.SignalExchange/* /management.ManagementService/*
+	reverse_proxy @backend netbird-server:80
+
+	# Dashboard (o restante)
+	reverse_proxy netbird-dashboard:80
+}
