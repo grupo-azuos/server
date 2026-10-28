@@ -48,6 +48,35 @@ mas não entram no painel. Crie a chave em **Settings → Onboarding**, preencha
 | [v1.0.0](versions/v1.0.0.md) | Como está hoje: Hostinger, Supabase, Vercel, Firebase |
 | [v1.0.1](versions/v1.0.1.md) | DigitalOcean (2 VPS + Postgres gerenciado com standby) e Cloudflare só DNS |
 
+## Deploy pelo GitHub Actions
+
+Dois workflows manuais, no mesmo formato do my-config:
+
+- **[Ansible Deploy](.github/workflows/deploy.yml):** **Actions → Ansible Deploy → Run workflow**, escolha o
+  servidor e a etapa (`servidores` roda docker, netbird-client, exporters, monitoring, komodo, komodo-periphery
+  e caddy, nessa ordem).
+- **[Ansible Clean](.github/workflows/clean.yml):** mesmo caminho, escolha o serviço e se apaga os volumes.
+
+Os dois têm **dry_run** (`--check`). O `homo` fica fora: ele é alterado só pelo painel do Coolify.
+
+**Secrets** (Settings → Secrets and variables → Actions):
+
+| Secret | Para quê |
+|---|---|
+| `SSH_PRIVATE_KEY` | Chave privada que entra como `root` em todos os servidores |
+| `SSH_PASSPHRASE` | *(Opcional)* Passphrase da chave |
+| `<SERVIDOR>_HOSTS_INI` | O `hosts.ini` de cada servidor (`MONITORAMENTO_HOSTS_INI`, `INTERNOS_HOSTS_INI`, `CRM_HOSTS_INI`, `AUTOMACAO_HOSTS_INI`, `PROD_HOSTS_INI`, `HOMO_HOSTS_INI`) |
+| `NETBIRD_CI_SETUP_KEY` | *(Opcional)* Setup Key **efêmera** do NetBird: o runner entra na VPN antes do SSH |
+
+- **Todos os `hosts.ini`, não só o do alvo.** O Prometheus lista os monitorados e o agente do Komodo procura o
+  Core, então o workflow grava todos os que existirem e roda com `--limit <servidor>`.
+- **SSH fechado no firewall:** com `NETBIRD_CI_SETUP_KEY`, os `hosts.ini` das secrets usam o IP do NetBird de
+  cada servidor. Sem ela, o SSH vai pelo IP público (útil na primeira subida, antes da VPN).
+- **Primeira subida:** `docker`, `netbird-client`, `komodo`, onboarding key no painel e na secret, depois
+  `komodo-periphery`, `caddy` e `monitoring` (detalhes nas etapas 8 e 9 abaixo).
+- **Environments** com o nome do servidor (`monitoramento`, `crm`…) são opcionais: servem para exigir aprovação
+  antes do deploy. Secrets cadastradas no Environment valem só para aquele servidor.
+
 ## Preparação (uma vez)
 
 ```bash

@@ -1,0 +1,174 @@
+name: Ansible Clean
+run-name: Clean em ${{ inputs.server }} (${{ inputs.target }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      server:
+        description: 'Servidor alvo (homo não: é alterado só pelo painel do Coolify)'
+        required: true
+        default: 'monitoramento'
+        type: choice
+        options:
+          - monitoramento
+          - internos
+          - crm
+          - automacao
+          - prod
+      target:
+        description: 'Serviço para parar e remover'
+        required: true
+        default: 'monitoring'
+        type: choice
+        options:
+          - monitoring
+          - exporters
+          - komodo
+          - komodo-periphery
+          - caddy
+          - netbird-client
+          - netbird
+          - tunnel
+      remove_volumes:
+        description: 'Apagar volumes de dados persistentes?'
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: 'Modo simulação (--check)?'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  clean:
+    name: Clean em ${{ github.event.inputs.server }} (${{ github.event.inputs.target }})
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.server }}
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar chave SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          PASSPHRASE: ${{ secrets.SSH_PASSPHRASE }}
+        run: |
+          if [ -z "$SSH_KEY" ]; then
+            echo "::error::Chave SSH não encontrada! Cadastre a secret 'SSH_PRIVATE_KEY'."
+            exit 1
+          fi
+
+          mkdir -p ~/.ssh
+          eval $(ssh-agent -s)
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+
+          # Normaliza quebras de linha literais caso a secret tenha sido salva com "\n" ou com CRLF
+          if echo "$SSH_KEY" | grep -q '\\n'; then
+            SSH_KEY=$(printf '%b' "$SSH_KEY")
+          fi
+
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > /tmp/id_ci
+          chmod 600 /tmp/id_ci
+
+          if ! grep -q -- "-----BEGIN" /tmp/id_ci; then
+            echo "::error::A chave SSH fornecida não é uma chave privada válida (falta o cabeçalho '-----BEGIN ...')! Verifique se você não copiou a chave pública (.pub) por engano."
+            rm -f /tmp/id_ci
+            exit 1
+          fi
+
+          export PASSPHRASE
+          if [ -n "$PASSPHRASE" ]; then
+            printf '#!/bin/sh\nexec printf "%%s\\n" "$PASSPHRASE"\n' > /tmp/ssh_askpass
+            chmod 700 /tmp/ssh_askpass
+            if ! DISPLAY=None SSH_ASKPASS=/tmp/ssh_askpass SSH_ASKPASS_REQUIRE=force ssh-add /tmp/id_ci; then
+              echo "::error::Falha ao desbloquear a chave SSH com a passphrase! Verifique a secret 'SSH_PASSPHRASE'."
+              rm -f /tmp/ssh_askpass /tmp/id_ci
+              exit 1
+            fi
+            rm -f /tmp/ssh_askpass
+          else
+            if ! ssh-add /tmp/id_ci; then
+              echo "::error::Falha ao carregar a chave SSH! Se ela tem passphrase, cadastre a secret 'SSH_PASSPHRASE'."
+              rm -f /tmp/id_ci
+              exit 1
+            fi
+          fi
+          rm -f /tmp/id_ci
+
+          echo "Chave SSH carregada com sucesso:"
+          ssh-add -l
+
+      # Com o SSH fechado no firewall, o runner entra na VPN com uma Setup Key efêmera
+      # e os hosts.ini das secrets usam o IP do NetBird de cada servidor.
+      - name: Entrar no NetBird (se NETBIRD_CI_SETUP_KEY existir)
+        env:
+          NETBIRD_CI_SETUP_KEY: ${{ secrets.NETBIRD_CI_SETUP_KEY }}
+        run: |
+          if [ -z "$NETBIRD_CI_SETUP_KEY" ]; then
+            echo "Sem NETBIRD_CI_SETUP_KEY: SSH pelo IP público."
+            exit 0
+          fi
+          curl -fsSL https://pkgs.netbird.io/install.sh | sh
+          sudo netbird up --management-url https://netbird.grupoazuos.com.br \
+            --setup-key "$NETBIRD_CI_SETUP_KEY" --hostname "gha-${{ github.run_id }}"
+          sudo netbird status
+
+      - name: Instalar Ansible
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ansible
+
+      # Todos os inventários, não só o do alvo: o Prometheus lista os monitorados e o
+      # agente do Komodo procura o Core. O --limit restringe onde o playbook roda.
+      - name: Configurar inventários (hosts.ini)
+        env:
+          TARGET_SERVER: ${{ github.event.inputs.server }}
+          PROD_HOSTS: ${{ secrets.PROD_HOSTS_INI }}
+          HOMO_HOSTS: ${{ secrets.HOMO_HOSTS_INI }}
+          AUTOMACAO_HOSTS: ${{ secrets.AUTOMACAO_HOSTS_INI }}
+          CRM_HOSTS: ${{ secrets.CRM_HOSTS_INI }}
+          INTERNOS_HOSTS: ${{ secrets.INTERNOS_HOSTS_INI }}
+          MONITORAMENTO_HOSTS: ${{ secrets.MONITORAMENTO_HOSTS_INI }}
+        run: |
+          for s in prod homo automacao crm internos monitoramento; do
+            var="${s^^}_HOSTS"
+            content="${!var}"
+            if [ -n "$content" ]; then
+              printf '%s\n' "$content" | tr -d '\r' > "configuration/servers/$s/hosts.ini"
+              chmod 600 "configuration/servers/$s/hosts.ini"
+              echo "hosts.ini de $s configurado"
+            fi
+          done
+
+          if [ ! -f "configuration/servers/${TARGET_SERVER}/hosts.ini" ]; then
+            echo "::error::Sem inventário para '${TARGET_SERVER}'! Cadastre a secret '${TARGET_SERVER^^}_HOSTS_INI'."
+            exit 1
+          fi
+
+      - name: Executar Playbook de Limpeza (clean.yml)
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+          ANSIBLE_FORCE_COLOR: "True"
+          TARGET_SERVER: ${{ github.event.inputs.server }}
+          TARGET: ${{ github.event.inputs.target }}
+          REMOVE_VOLUMES: ${{ github.event.inputs.remove_volumes }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          CHECK_ARG=""
+          if [ "$DRY_RUN" = "true" ]; then
+            CHECK_ARG="--check"
+          fi
+
+          ansible-playbook configuration/ansible/clean.yml \
+            --tags "$TARGET" --limit "$TARGET_SERVER" \
+            -e remove_volumes="$REMOVE_VOLUMES" $CHECK_ARG
+
+      - name: Sair do NetBird
+        if: always()
+        run: |
+          if command -v netbird >/dev/null; then
+            sudo netbird down || true
+          fi
