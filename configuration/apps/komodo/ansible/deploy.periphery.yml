@@ -14,7 +14,7 @@
 # Funciona com --limit <servidor>: lê a wt0 do Core por SSH.
 - name: "[komodo-periphery] Ler interface wt0 do Core"
   setup:
-    filter: ansible_wt0
+    filter: [ansible_wt0, ansible_eth1]
   delegate_to: "{{ groups['komodo_core'][0] }}"
   delegate_facts: true
   run_once: true
@@ -23,7 +23,7 @@
   
 - name: "[komodo-periphery] Endereço do Core"
   set_fact:
-    komodo_core_address: "{{ komodo_core_address | default('ws://' ~ (hostvars[groups['komodo_core'][0]].vpn_ip | default(hostvars[groups['komodo_core'][0]].ansible_wt0.ipv4.address | default(''))) ~ ':9120') }}"
+    komodo_core_address: "{{ komodo_core_address | default('ws://' ~ (hostvars[groups['komodo_core'][0]].vpn_ip | default(hostvars[groups['komodo_core'][0]].ansible_wt0.ipv4.address | default(hostvars[groups['komodo_core'][0]].ansible_eth1.ipv4.address | default('')))) ~ ':9120') }}"
   tags: [komodo-periphery]
 
 - name: "[komodo-periphery] Conferir endereço do Core"

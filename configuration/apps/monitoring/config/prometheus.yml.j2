@@ -15,7 +15,7 @@ scrape_configs:
 
   - job_name: "node-exporter"
     static_configs:
-{% for h in groups['monitorados'] %}
+{% for h in monitored_vpn_ips %}
       - targets: ["{{ monitored_vpn_ips[h] }}:9100"]
         labels:
           instance: "{{ hostvars[h].server }}"
@@ -24,7 +24,7 @@ scrape_configs:
 
   - job_name: "cadvisor"
     static_configs:
-{% for h in groups['monitorados'] %}
+{% for h in monitored_vpn_ips %}
       - targets: ["{{ monitored_vpn_ips[h] }}:9101"]
         labels:
           instance: "{{ hostvars[h].server }}"

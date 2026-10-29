@@ -17,12 +17,14 @@
     creates: /usr/bin/netbird
   tags: [netbird-client]
 
-- name: "[netbird-client] Garantir resolução de loopback do NetBird no /etc/hosts (servidor da VPN)"
+# Só no prod (Hostinger não alcança o próprio IP público). O ops segue o DNS: hoje entra no
+# NetBird do legado e, depois da virada, no dele mesmo, sem cadastrar de novo.
+- name: "[netbird-client] Garantir resolução de loopback do NetBird no /etc/hosts (prod)"
   lineinfile:
     path: /etc/hosts
     line: "127.0.0.1 {{ netbird_domain }}"
     state: present
-  when: inventory_hostname in groups['netbird_server'] | default([])
+  when: server == 'prod'
   tags: [netbird-client]
 
 - name: "[netbird-client] Iniciar e habilitar serviço do NetBird"

@@ -18,23 +18,30 @@
 # Funciona com --limit ops: lê a wt0 de cada servidor por SSH.
 - name: "[prometheus-grafana] Ler interface wt0 dos servidores monitorados"
   setup:
-    filter: ansible_wt0
+    filter: [ansible_wt0, ansible_eth1]
   delegate_to: "{{ item }}"
   delegate_facts: true
   loop: "{{ groups['monitorados'] }}"
   when: hostvars[item].vpn_ip is not defined
+  ignore_unreachable: true
   tags: [prometheus-grafana]
 
 - name: "[prometheus-grafana] Montar lista de IPs do NetBird"
   set_fact:
-    monitored_vpn_ips: "{{ monitored_vpn_ips | default({}) | combine({item: hostvars[item].vpn_ip | default(hostvars[item].ansible_wt0.ipv4.address | default(''))}) }}"
+    monitored_vpn_ips: "{{ monitored_vpn_ips | default({}) | combine({item: hostvars[item].vpn_ip | default(hostvars[item].ansible_wt0.ipv4.address | default(hostvars[item].ansible_eth1.ipv4.address | default('')))}) }}"
   loop: "{{ groups['monitorados'] }}"
   tags: [prometheus-grafana]
 
-- name: "[prometheus-grafana] Conferir IPs do NetBird"
-  assert:
-    that: monitored_vpn_ips | dict2items | selectattr('value', 'equalto', '') | list | length == 0
-    fail_msg: "Sem IP do NetBird em: {{ monitored_vpn_ips | dict2items | selectattr('value', 'equalto', '') | map(attribute='key') | join(', ') }}. Rode netbird-client nesses servidores ou preencha vpn_ip no hosts.ini"
+# Servidor inacessível ou sem IP fica fora do prometheus.yml; rode a etapa de novo quando ele entrar
+- name: "[prometheus-grafana] Aviso: servidores fora da coleta"
+  debug:
+    msg: "Fora da coleta (sem acesso ou sem IP): {{ monitored_vpn_ips | dict2items | selectattr('value', 'equalto', '') | map(attribute='key') | join(', ') }}"
+  when: monitored_vpn_ips | dict2items | selectattr('value', 'equalto', '') | list | length > 0
+  tags: [prometheus-grafana]
+
+- name: "[prometheus-grafana] Só os servidores com IP"
+  set_fact:
+    monitored_vpn_ips: "{{ monitored_vpn_ips | dict2items | rejectattr('value', 'equalto', '') | items2dict }}"
   tags: [prometheus-grafana]
 
 - name: "[prometheus-grafana] Criar diretórios de deploy"

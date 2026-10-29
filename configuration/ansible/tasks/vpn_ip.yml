@@ -1,13 +1,21 @@
 ---
-# IP deste servidor no NetBird: `vpn_ip=` do hosts.ini ou, sem ele, o da interface wt0.
+# IP em que os serviços escutam: `vpn_ip=` do hosts.ini, a interface wt0 (NetBird) ou, enquanto o
+# servidor não está na VPN, o IP privado da VPC (eth1). Nada disso é público. Depois do
+# netbird-client, rode as etapas de novo para os serviços passarem para o IP do NetBird.
 # Tag `always`: roda sempre que a etapa que inclui este arquivo roda.
-- name: "[vpn] Descobrir IP do NetBird deste servidor"
+- name: "[vpn] Descobrir IP dos serviços"
   set_fact:
-    vpn_ip: "{{ vpn_ip | default(ansible_wt0.ipv4.address | default('')) }}"
+    vpn_ip: "{{ vpn_ip | default(ansible_wt0.ipv4.address | default(ansible_eth1.ipv4.address | default(''))) }}"
   tags: [always]
 
-- name: "[vpn] Conferir IP do NetBird"
+- name: "[vpn] Conferir IP dos serviços"
   assert:
     that: vpn_ip | length > 0
-    fail_msg: "Sem IP do NetBird (wt0) em {{ inventory_hostname }}. Rode a etapa netbird-client antes, ou preencha vpn_ip no hosts.ini"
+    fail_msg: "Sem IP do NetBird (wt0) nem da VPC (eth1) em {{ inventory_hostname }}. Rode netbird-client ou preencha vpn_ip no hosts.ini"
+  tags: [always]
+
+- name: "[vpn] Aviso: fora da VPN"
+  debug:
+    msg: "{{ inventory_hostname }} ainda sem NetBird: serviços no IP privado {{ vpn_ip }}. Depois do netbird-client, rode esta etapa de novo."
+  when: ansible_wt0 is not defined
   tags: [always]
