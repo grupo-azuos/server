@@ -1,6 +1,6 @@
 # Servidor ops
 
-Painel do Komodo e monitoramento de todos os servidores: Prometheus coleta os exporters de cada um pelo NetBird e o Grafana mostra os painéis. Painéis em `komodo.`, `grafana.`, `prometheus.` e `cockpit-ops.<domain>`, só pela VPN (`vpn_only` no Caddy).
+Painel do Komodo e monitoramento de todos os servidores: Prometheus coleta os exporters de cada um pelo NetBird e o Grafana mostra os painéis. Painéis em `komodo.`, `grafana.`, `prometheus.` e `cockpit.ops.<domain>`, só pela VPN (`vpn_only` no Caddy).
 
 ## O que roda aqui
 

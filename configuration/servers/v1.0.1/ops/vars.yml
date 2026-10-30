@@ -22,7 +22,7 @@ caddy_routes:
   - hosts: ["prometheus.{{ domain }}"]
     upstream: "{{ vpn_ip }}:9090"
     vpn_only: true
-  - hosts: ["cockpit-ops.{{ domain }}"]
+  - hosts: ["cockpit.ops.{{ domain }}"]
     upstream: "https://{{ vpn_ip }}:{{ cockpit_port }}"
     tls_insecure: true
     vpn_only: true
