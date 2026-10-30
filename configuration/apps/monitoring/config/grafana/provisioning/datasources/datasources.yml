@@ -4,7 +4,13 @@ datasources:
   - name: Prometheus
     type: prometheus
     access: proxy
-    # PROMETHEUS_URL vem do compose (IP do ops no NetBird)
+    # PROMETHEUS_URL e LOKI_URL vêm do compose (IP do ops na VPN)
     url: $PROMETHEUS_URL
     isDefault: true
+    editable: true
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: $LOKI_URL
     editable: true

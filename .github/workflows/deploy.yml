@@ -28,6 +28,8 @@ on:
           - cockpit
           - node-exporter-cadvisor
           - prometheus-grafana
+          - loki
+          - alloy
           - komodo-core
           - komodo-periphery
       dry_run:
@@ -203,7 +205,7 @@ jobs:
           fi
 
           if [ "$STEP" = "all" ]; then
-            STEP="docker,caddy,netbird,netbird-client,cockpit,node-exporter-cadvisor,prometheus-grafana,komodo-core,komodo-periphery"
+            STEP="docker,caddy,netbird,netbird-client,cockpit,node-exporter-cadvisor,prometheus-grafana,loki,alloy,komodo-core,komodo-periphery"
           fi
 
           # vars.yml de cada servidor é carregado pelo próprio deploy.yml

@@ -16,6 +16,8 @@ Painel do Komodo e monitoramento de todos os servidores: Prometheus coleta os ex
 | Caddy | Docker (`/opt/caddy`) | borda, TLS automático, `:80`/`:443` | `caddy`, ver [apps/caddy](../../../apps/caddy/README.md) |
 | Prometheus | Docker (`/opt/monitoring`) | `http://<IP NetBird>:9090` | `prometheus-grafana` |
 | Grafana | Docker (`/opt/monitoring`) | `http://<IP NetBird>:3000` | `prometheus-grafana` |
+| Loki | Docker (`/opt/loki`) | `http://<IP da VPN>:3100`, logs de todos os servidores (15 dias) | `loki` |
+| Alloy | Docker (`/opt/alloy`) | envia logs dos containers e do journald ao Loki | `alloy` |
 
 Sem Coolify.
 

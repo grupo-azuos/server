@@ -1,0 +1,84 @@
+---
+# =========================================================================
+# === ALLOY (COLETOR DE LOGS) ===
+# =========================================================================
+# Em todo servidor do grupo `monitorados`. Envia para o Loki do ops.
+
+- name: "[alloy] IP do NetBird"
+  include_tasks: "{{ playbook_dir }}/tasks/vpn_ip.yml"
+  tags: [alloy]
+
+# Funciona com --limit <servidor>: lê as interfaces do ops por SSH.
+- name: "[alloy] Ler interfaces do ops"
+  setup:
+    filter: [ansible_wt0, ansible_eth1]
+  delegate_to: "{{ groups['ops'][0] }}"
+  delegate_facts: true
+  run_once: true
+  when: loki_url is not defined and hostvars[groups['ops'][0]].vpn_ip is not defined
+  tags: [alloy]
+
+- name: "[alloy] Endereço do Loki"
+  set_fact:
+    loki_url: >-
+      {%- set o = hostvars[groups['ops'][0]] -%}
+      {{ loki_url | default('http://' ~ o.vpn_ip | default(o.ansible_wt0.ipv4.address | default(o.ansible_eth1.ipv4.address | default(''))) ~ ':3100/loki/api/v1/push') }}
+  tags: [alloy]
+
+- name: "[alloy] Conferir endereço do Loki"
+  assert:
+    that: loki_url is not search('http://:')
+    fail_msg: "Sem IP do ops. Rode as etapas nele antes ou preencha loki_url no hosts.ini"
+  tags: [alloy]
+
+- name: "[alloy] Criar diretório"
+  file:
+    path: "{{ alloy_path }}"
+    state: directory
+    mode: '0755'
+  tags: [alloy]
+
+- name: "[alloy] Garantir pastas do journald"
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop: [/var/log/journal, /run/log/journal]
+  tags: [alloy]
+
+- name: "[alloy] Copiar docker-compose e config.alloy"
+  copy:
+    src: "{{ apps_dir }}/monitoring/{{ item.src }}"
+    dest: "{{ alloy_path }}/{{ item.dest }}"
+    mode: '0644'
+  loop:
+    - { src: compose.alloy.yml, dest: docker-compose.yml }
+    - { src: config/alloy/config.alloy, dest: config.alloy }
+  register: alloy_files
+  tags: [alloy]
+
+- name: "[alloy] Criar .env"
+  copy:
+    dest: "{{ alloy_path }}/.env"
+    content: |
+      VPN_IP={{ vpn_ip }}
+      LOKI_URL={{ loki_url }}
+      SERVER={{ server }}
+    mode: '0644'
+  register: alloy_env
+  tags: [alloy]
+
+- name: "[alloy] Subir Alloy"
+  command: docker compose up -d --remove-orphans {{ '--force-recreate' if (alloy_files.changed or alloy_env.changed) else '' }}
+  args:
+    chdir: "{{ alloy_path }}"
+  tags: [alloy]
+
+- name: "[alloy] Conferir Alloy pronto"
+  uri:
+    url: "http://{{ vpn_ip }}:12345/-/ready"
+  register: alloy_check
+  retries: 20
+  delay: 3
+  until: alloy_check.status == 200
+  tags: [alloy]

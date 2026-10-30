@@ -34,7 +34,7 @@ Cada um tem um Caddy (borda com TLS automático; no homo, atrás da borda pela V
 **Tudo de uma vez**, nessa ordem:
 
 ```bash
-ansible-playbook configuration/ansible/deploy.yml --tags docker,caddy,netbird,netbird-client,cockpit,node-exporter-cadvisor,prometheus-grafana,komodo-core,komodo-periphery
+ansible-playbook configuration/ansible/deploy.yml --tags docker,caddy,netbird,netbird-client,cockpit,node-exporter-cadvisor,prometheus-grafana,loki,alloy,komodo-core,komodo-periphery
 ```
 
 Na primeira vez a onboarding key ainda não existe (ela é criada no painel do Komodo), então os agentes sobem
@@ -53,7 +53,7 @@ mas não entram no painel. Crie a chave em **Settings → Onboarding**, preencha
 Dois workflows manuais, no mesmo formato do my-config:
 
 - **[ansible-deploy](.github/workflows/deploy.yml):** **Actions → ansible-deploy → Run workflow**, escolha o
-  servidor e o serviço (`all` roda `docker`, `caddy`, `netbird`, `netbird-client`, `cockpit`, `node-exporter-cadvisor`, `prometheus-grafana`, `komodo-core`, `komodo-periphery`, nessa ordem).
+  servidor e o serviço (`all` roda `docker`, `caddy`, `netbird`, `netbird-client`, `cockpit`, `node-exporter-cadvisor`, `prometheus-grafana`, `loki`, `alloy`, `komodo-core`, `komodo-periphery`, nessa ordem).
 - **[ansible-clean](.github/workflows/clean.yml):** mesmo caminho, escolha o serviço e se apaga os volumes.
 
 Os dois têm **dry_run** (`--check`). Servidores: `ops`, `core`, `crm` e `auto`. O `homo` é

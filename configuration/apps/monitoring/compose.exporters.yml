@@ -3,7 +3,7 @@
 # ops coleta pela VPN e nada fica exposto no IP público.
 services:
   node-exporter:
-    image: prom/node-exporter:v1.7.0
+    image: prom/node-exporter:v1.12.1
     container_name: node-exporter
     restart: unless-stopped
     network_mode: host
@@ -15,7 +15,7 @@ services:
       - /:/host:ro,rslave
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    image: ghcr.io/google/cadvisor:v0.60.6
     container_name: cadvisor
     restart: unless-stopped
     network_mode: host
@@ -28,6 +28,12 @@ services:
       - "--port=9101"
       - "--docker_only=true"
       - "--housekeeping_interval=30s"
+    # O healthcheck da imagem olha localhost:8080; aqui é o IP da VPN e a 9101
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://${VPN_IP}:9101/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro

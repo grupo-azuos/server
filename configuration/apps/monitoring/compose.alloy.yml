@@ -1,0 +1,27 @@
+# Alloy (coletor de logs), em todos os servidores monitorados (/opt/alloy).
+# Lê os logs dos containers (Docker) e do sistema (journald) e envia ao Loki do ops pela VPN.
+services:
+  alloy:
+    image: grafana/alloy:v1.21.2
+    container_name: alloy
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - "run"
+      - "--server.http.listen-addr=${VPN_IP:?}:12345"
+      - "--storage.path=/var/lib/alloy/data"
+      - "/etc/alloy/config.alloy"
+    environment:
+      - LOKI_URL=${LOKI_URL:?}
+      - SERVER=${SERVER:?}
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/log/journal:/var/log/journal:ro
+      - /run/log/journal:/run/log/journal:ro
+      - /etc/machine-id:/etc/machine-id:ro
+      - alloy-data:/var/lib/alloy/data
+
+volumes:
+  alloy-data:
+    name: alloy-data

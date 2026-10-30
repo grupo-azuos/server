@@ -3,7 +3,7 @@
 #   ansible-playbook configuration/ansible/deploy.yml --tags <etapa>
 # Só um servidor: acrescente --limit <servidor> (prod, homo, auto, crm, core, ops).
 # Tudo de um servidor, na ordem:
-#   --tags docker,caddy,netbird,netbird-client,cockpit,node-exporter-cadvisor,prometheus-grafana,komodo-core,komodo-periphery
+#   --tags docker,caddy,netbird,netbird-client,cockpit,node-exporter-cadvisor,prometheus-grafana,loki,alloy,komodo-core,komodo-periphery
 - name: Deploy Server Infrastructure
   hosts: all
   become: yes
@@ -14,6 +14,8 @@
     netbird_path: "/opt/netbird"
     supabase_path: "/opt/supabase"
     monitoring_path: "/opt/monitoring"
+    loki_path: "/opt/loki"
+    alloy_path: "/opt/alloy"
     exporters_path: "/opt/exporters"
     komodo_path: "/opt/komodo"
     komodo_periphery_path: "/opt/komodo-periphery"
@@ -118,6 +120,16 @@
       include_tasks: "{{ apps_dir }}/monitoring/ansible/deploy.yml"
       when: server == 'ops'
       tags: [prometheus-grafana]
+
+    - name: "[loki] Deploy Loki"
+      include_tasks: "{{ apps_dir }}/monitoring/ansible/deploy.loki.yml"
+      when: server == 'ops'
+      tags: [loki]
+
+    - name: "[alloy] Deploy Alloy"
+      include_tasks: "{{ apps_dir }}/monitoring/ansible/deploy.alloy.yml"
+      when: inventory_hostname in groups['monitorados'] | default([])
+      tags: [alloy]
 
     # -------------------------------------------------------------------------
     # Komodo: Core (painel) no komodo_core, agente em todo servidor do grupo komodo
