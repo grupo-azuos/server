@@ -7,11 +7,25 @@ caddy_mode: edge
 #   upstream: <container>:<porta>   app na rede docker `caddy` deste servidor
 #   server: <nome>                  repassa pela VPN ao Caddy daquele servidor (modo local)
 #   path: /x/*                      (opcional) publica só esse caminho; o resto responde 404
+#   vpn_only: true                  (opcional) só quem está no NetBird
+#   public_path: /x/*               (opcional, com vpn_only) esse caminho fica público
+#   tls_insecure: true              (opcional) destino HTTPS com certificado autoassinado
 caddy_routes:
-  # Webhooks do GitHub para o Komodo: só /listener fica público, o painel segue só na VPN
+  # Painel só na VPN; os webhooks do GitHub (/listener) ficam públicos
   - hosts: ["komodo.{{ domain }}"]
-    path: /listener/*
     upstream: komodo-core:9120
+    vpn_only: true
+    public_path: /listener/*
+  - hosts: ["grafana.{{ domain }}"]
+    upstream: "{{ vpn_ip }}:3000"
+    vpn_only: true
+  - hosts: ["prometheus.{{ domain }}"]
+    upstream: "{{ vpn_ip }}:9090"
+    vpn_only: true
+  - hosts: ["cockpit-ops.{{ domain }}"]
+    upstream: "https://{{ vpn_ip }}:{{ cockpit_port }}"
+    tls_insecure: true
+    vpn_only: true
   # Homologação: a borda emite o certificado e repassa pela VPN ao Caddy do homo
   # - hosts: ["app.homo.{{ domain }}"]
   #   server: homo

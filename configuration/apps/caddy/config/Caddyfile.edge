@@ -3,4 +3,11 @@
 	email {$EMAIL}
 }
 
+# Rotas com `vpn_only: true`: só quem vem da faixa do NetBird. O peer do ops anuncia o IP público
+# dele como rota no NetBird, então quem está na VPN chega aqui com o IP 100.x.
+(vpn_only) {
+	@fora_da_vpn not remote_ip {$VPN_CIDR} 127.0.0.0/8 172.16.0.0/12
+	abort @fora_da_vpn
+}
+
 import /etc/caddy/conf.d/*.caddy

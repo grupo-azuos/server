@@ -1,2 +1,3 @@
 [WebService]
-Origins = https://{{ vpn_ip }}:{{ cockpit_port }} wss://{{ vpn_ip }}:{{ cockpit_port }}
+Origins = https://{{ vpn_ip }}:{{ cockpit_port }} wss://{{ vpn_ip }}:{{ cockpit_port }} https://cockpit-{{ server }}.{{ domain }} wss://cockpit-{{ server }}.{{ domain }}
+ProtocolHeader = X-Forwarded-Proto
